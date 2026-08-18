@@ -147,6 +147,9 @@ dependencies {
     // JUnit 5：纯 Java 逻辑（任务分配器、配置解析）的单元测试
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // 测试运行时需要 Gson（MC 本体内置的 Gson 不参与 test 类路径，需单独声明；
+    // 版本与 MC 1.21.11 捆绑的 2.13.2 保持一致，坐标组名是 com.google.code.gson）
+    testImplementation 'com.google.code.gson:gson:2.13.2'
 }
 
 // 单元测试使用 JUnit 5 平台
