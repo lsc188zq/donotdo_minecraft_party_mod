@@ -1,5 +1,6 @@
 package com.partygame.game;
 
+import com.partygame.arena.ArenaGenerator;
 import com.partygame.config.ModConfig;
 import com.partygame.task.Assignment;
 import com.partygame.task.TaskAssigner;
@@ -56,6 +57,7 @@ public class GameManager {
 
     public void startGame(ServerLevel level) {
         if (phase != GamePhase.IDLE) throw new IllegalStateException("游戏已在进行中");
+        if (!isArenaSet()) throw new IllegalStateException("请先设置竞技场中心（/party setarena）");
         List<ServerPlayer> players = level.getServer().getPlayerList().getPlayers();
         if (players.size() < 2) throw new IllegalStateException("至少需要 2 名玩家");
         currentLevel = level;
@@ -71,6 +73,8 @@ public class GameManager {
     // ---------- 回合流程 ----------
 
     private void beginRound() {
+        // 每回合重建竞技场（覆盖区域不恢复），重新摆放装备箱
+        ArenaGenerator.generate(currentLevel, arenaCenter, config, currentLevel.getRandom());
         List<ServerPlayer> players = currentLevel.getServer().getPlayerList().getPlayers();
         // 上一回合出局的旁观者重新进场参与，分数保留
         TaskPool pool = new TaskPool(config.taskPool());
