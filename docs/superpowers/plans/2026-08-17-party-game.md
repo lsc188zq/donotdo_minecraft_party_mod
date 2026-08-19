@@ -1777,6 +1777,8 @@ git branch -d feat/commands
 
 ### Task 9: GameTest 竞技场结构测试
 
+> **已跳过（2026-08-20 与用户确认）**：21.11.45 的 GameTest 框架已完全重写——`@GameTest`/`@GameTestHolder` 注解不存在，测试改为 TestFunctionLoader + RegisterGameTestsEvent + 结构模板 NBT 的注册方式，且测试必须锚定真实存在的结构模板（无模板报 `structure.failure`）。实现成本高、文档少，竞技场结构验证并入 Task 10 手测清单。若以后要自动化，按 CLAUDE.md 已知坑中的新框架要点实现。
+
 **Files:**
 - Create: `src/main/java/com/partygame/gametest/ArenaGameTests.java`
 

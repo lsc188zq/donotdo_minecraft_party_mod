@@ -11,18 +11,18 @@
 
 - 直连 NeoForge/Mojang 官方仓库会下载到 0 字节 .pom，报 XML"前言中不允许有内容"。`build.gradle` 已配阿里云镜像优先；若再遇此错，删除 `~/.gradle/caches/modules-2/files-2.1/<group>/<artifact>/<version>` 及对应 `metadata-*/descriptors` 后重试
 - Gson 测试依赖坐标是 `com.google.code.gson:gson:2.13.2`（组名不是 `com.google.gson`，详见 build.gradle 注释）
-- 21.11.45 与常见教程的 API 差异大：`ResourceLocation`→`Identifier`；`ServerPlayer` 无 `displayTitle`（用 `ClientboundSetTitleTextPacket`）；`GameProfile.getName()` 已不存在（用 `getScoreboardName()`）；`teleportTo` 需 `Set<Relative>` + setCamera 布尔；`@EventBusSubscriber` 无 `bus` 属性（游戏总线事件用 `NeoForge.EVENT_BUS.register(obj)`）；事件 API 与教程差异：无 `LivingHurtEvent`（用 `LivingIncomingDamageEvent`）、`LivingJumpEvent` 是 `LivingEvent.LivingJumpEvent` 嵌套类、`ItemStack` 无 `isEdible()`（用 `has(DataComponents.FOOD)`）、菜单无 `getContainerBlockState()`（开箱判定用 `ChestMenu`）。**凡不确定的签名，先查 `~/.gradle/caches/neoformruntime/intermediate_results/` 下的反编译 jar**（`compiledWithNeoForge_*_output.jar` 用 javap，`sourcesAndCompiledWithNeoForge_*_output.jar` 用 unzip -p）
+- 21.11.45 与常见教程的 API 差异大：`ResourceLocation`→`Identifier`；`ServerPlayer` 无 `displayTitle`（用 `ClientboundSetTitleTextPacket`）；`GameProfile.getName()` 已不存在（用 `getScoreboardName()`）；`teleportTo` 需 `Set<Relative>` + setCamera 布尔；`@EventBusSubscriber` 无 `bus` 属性（游戏总线事件用 `NeoForge.EVENT_BUS.register(obj)`）；事件 API 与教程差异：无 `LivingHurtEvent`（用 `LivingIncomingDamageEvent`）、`LivingJumpEvent` 是 `LivingEvent.LivingJumpEvent` 嵌套类、`ItemStack` 无 `isEdible()`（用 `has(DataComponents.FOOD)`）、菜单无 `getContainerBlockState()`（开箱判定用 `ChestMenu`）；命令权限用新系统 `Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)`（`CommandSourceStack.hasPermission(int)` 已删）；`RegisterCommandsEvent` 在游戏总线；FML 类在 `net.neoforged.fancymodloader:loader` jar 里（`@EventBusSubscriber` 的 `value`/`modid` 均必填）。**凡不确定的签名，先查 `~/.gradle/caches/neoformruntime/intermediate_results/` 下的反编译 jar**（`compiledWithNeoForge_*_output.jar` 用 javap，`sourcesAndCompiledWithNeoForge_*_output.jar` 用 unzip -p；含 NeoForge 补丁的完整编译产物在 `build/moddev/artifacts/neoforge-21.11.45.jar`，源码在 `-sources.jar`）
+- GameTest 框架在 21.11.45 已重写（Task 9 因此跳过）：无 `@GameTest`/`@GameTestHolder`；新流程 = `TestFunctionLoader.registerLoader`（数据加载前）+ `RegisterGameTestsEvent`（MOD 总线）`registerEnvironment`/`registerTest`；测试锚定 `TestInstanceBlockEntity`，函数测试也必须引用能解析到的结构模板（否则 `structure.failure`）
 
 ## 协作规则
 
 - 代码注释中文、标识符英文
 - 提交信息：Conventional Commits + 中文描述；禁止进度词与 AI 工具名
-- 每任务一个 feature 分支（`feat/xxx`），合并后删除分支；git 操作由用户亲手执行（学习目标）
+- 开发直接在 main 工作区改文件；一个项目（大任务）完成后由用户自己建分支提交合并，Claude 只报进度名称、不给 git 命令；任务清单用大任务粒度
 - 任何"已完成/已通过"结论必须附验证方式（gradle 输出、测试报告、日志）
 
 ## 进度
 
-- Task 0 环境 ✅ / Task 1 骨架 ✅ / Task 2 配置系统 ✅ / Task 3 任务模型 ✅ / Task 4 状态机 ✅ / Task 5 竞技场 ✅ / Task 6 事件监听器 ✅（更新于 2026-08-19）
-- 下一步：Task 7 计分板（分支 B 自定义 HUD）
-- 之后：Task 8 /party 命令 → Task 9 GameTest → Task 10 联机手测
+- Task 0 环境 ✅ / Task 1 骨架 ✅ / Task 2 配置系统 ✅ / Task 3 任务模型 ✅ / Task 4 状态机 ✅ / Task 5 竞技场 ✅ / Task 6 事件监听器 ✅ / Task 7 计分板 ✅ / Task 8 /party 命令 ✅ / Task 9 GameTest 跳过（框架重写，并入 Task 10 手测）（更新于 2026-08-20）
+- 下一步：Task 10 联机手测
 - 距离类任务（"不能靠近某人"等）在 v1 跑通后加入（设计文档第 12 节）
