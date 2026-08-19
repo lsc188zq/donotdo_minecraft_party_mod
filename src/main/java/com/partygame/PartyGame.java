@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 import com.partygame.config.ModConfig;
+import com.partygame.event.GameEventListeners;
 import com.partygame.game.GameManager;
 
 import net.neoforged.bus.api.IEventBus;
@@ -24,6 +25,8 @@ public class PartyGame {
         GameManager.get().init(ModConfig.load(Paths.get("config", "partygame.json")));
         // 把 GameManager 单例注册到游戏事件总线（其 @SubscribeEvent 方法会被反射发现）
         NeoForge.EVENT_BUS.register(GameManager.get());
+        // 注册事件监听器类（静态 @SubscribeEvent 方法，注册 Class 即可）
+        NeoForge.EVENT_BUS.register(GameEventListeners.class);
         LOGGER.info("PartyGame 已加载");
     }
 }
