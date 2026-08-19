@@ -23,6 +23,7 @@
 
 ## 进度
 
-- Task 0 环境 ✅ / Task 1 骨架 ✅ / Task 2 配置系统 ✅ / Task 3 任务模型 ✅ / Task 4 状态机 ✅ / Task 5 竞技场 ✅ / Task 6 事件监听器 ✅ / Task 7 计分板 ✅ / Task 8 /party 命令 ✅ / Task 9 GameTest 跳过（框架重写，并入 Task 10 手测）（更新于 2026-08-20）
-- 下一步：Task 10 联机手测
-- 距离类任务（"不能靠近某人"等）在 v1 跑通后加入（设计文档第 12 节）
+- v1 全部完成 ✅：Task 0-8 实现 + Task 9 跳过（GameTest 框架重写）+ Task 10 联机手测通过（更新于 2026-08-20）
+- v2 规划完成：设计规格 `docs/superpowers/specs/2026-08-20-v2-design.md`、实施计划 `docs/superpowers/plans/2026-08-20-v2.md`、任务维护指南 `docs/task-maintenance-guide.md`
+- 下一步：按 v2 计划 Task 1 地图系统 → 2 HUD → 3 判定 → 4 配置命令 → 5 文档；**每个 Task 完成后停下，等用户提交再继续**
+- 距离类任务（"不能靠近某人"等）在 v2 之后加入（设计文档第 12 节）
