@@ -60,7 +60,9 @@ public class GameManager {
         if (phase != GamePhase.IDLE) throw new IllegalStateException("游戏已在进行中");
         if (!isArenaSet()) throw new IllegalStateException("请先设置竞技场中心（/party setarena）");
         List<ServerPlayer> players = level.getServer().getPlayerList().getPlayers();
-        if (players.size() < 2) throw new IllegalStateException("至少需要 2 名玩家");
+        if (players.size() < config.minPlayers()) {
+            throw new IllegalStateException("至少需要 " + config.minPlayers() + " 名玩家");
+        }
         currentLevel = level;
         beginRound();
     }

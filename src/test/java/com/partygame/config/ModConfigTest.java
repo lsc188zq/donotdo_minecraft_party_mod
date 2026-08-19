@@ -21,11 +21,22 @@ class ModConfigTest {
         assertEquals(180, config.playingSeconds());
         assertEquals(10, config.scoringSeconds());
         assertEquals(5, config.targetScore());
+        assertEquals(2, config.minPlayers());
         assertEquals(15, config.arenaHalfSize());
         assertEquals(3, config.arenaWallHeight());
         assertEquals(4, config.chestCount());
         assertEquals(2, config.loot("weapons").size());
         assertEquals(4, config.loot("armor").size());
+    }
+
+    @Test
+    void oldConfigWithoutMinPlayersFallsBackToTwo() throws Exception {
+        Path tempFile = Files.createTempFile("partygame-config-test", ".json");
+        // 旧版本生成的配置没有 minPlayers 字段，按默认 2 处理避免读不到值崩溃
+        Files.writeString(tempFile, "{ \"targetScore\": 5 }");
+        ModConfig config = ModConfig.load(tempFile);
+
+        assertEquals(2, config.minPlayers());
     }
 
     @Test

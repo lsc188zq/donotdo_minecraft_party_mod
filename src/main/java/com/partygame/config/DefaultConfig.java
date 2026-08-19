@@ -6,6 +6,7 @@ public class DefaultConfig {
         {
           "durations": { "preparingSeconds": 30, "playingSeconds": 180, "scoringSeconds": 10 },
           "targetScore": 5,
+          "minPlayers": 2,
           "arena": { "halfSize": 15, "wallHeight": 3 },
           "taskPool": [
             { "id": "press_button",   "type": "MUST_DO",   "triggers": ["PRESS_BUTTON"],    "displayName": "按下竞技场内的按钮" },

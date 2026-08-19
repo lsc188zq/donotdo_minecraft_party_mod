@@ -40,6 +40,9 @@ public class ModConfig {
     public int playingSeconds()  { return root.getAsJsonObject("durations").get("playingSeconds").getAsInt(); }
     public int scoringSeconds()  { return root.getAsJsonObject("durations").get("scoringSeconds").getAsInt(); }
     public int targetScore()     { return root.get("targetScore").getAsInt(); }
+    // 开局所需最少玩家数；单人测试时可把配置文件里的 minPlayers 改为 1
+    // （旧配置文件没有该字段时按默认 2 处理）
+    public int minPlayers()      { return root.has("minPlayers") ? root.get("minPlayers").getAsInt() : 2; }
     public int arenaHalfSize()   { return root.getAsJsonObject("arena").get("halfSize").getAsInt(); }
     public int arenaWallHeight() { return root.getAsJsonObject("arena").get("wallHeight").getAsInt(); }
     public int chestCount()      { return root.getAsJsonObject("loot").get("chestCount").getAsInt(); }

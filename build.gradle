@@ -65,6 +65,14 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
+        // 第二个客户端：双人联机测试用。两个客户端默认用户名相同（Dev），
+        // 同名后进者会被服务器踢下线，故用 --username 覆盖为 Dev2
+        client2 {
+            client()
+            programArgument '--username'
+            programArgument 'Dev2'
+        }
+
         server {
             server()
             programArgument '--nogui'

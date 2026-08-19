@@ -4,10 +4,14 @@
 `run/server/server.properties` 设 `online-mode=false`；另开两个 `.\gradlew.bat runClient` 连接 localhost。
 OP 自己：服务器控制台输入 `op <名字>`。
 
+单人快速测试：先把 `run/server/config/partygame.json` 里的 `minPlayers` 改成 `1`
+（配置文件在首次跑服务器后自动生成），然后只需一个客户端即可 /party start。
+双人联机时改回 2（或保持默认）。
+
 ## 准备
 
 - [ ] /party setarena：反馈中心点坐标
-- [ ] /party start（1 人时）：报错"至少需要 2 名玩家"
+- [ ] /party start（人数不足 minPlayers 时）：报错"至少需要 N 名玩家"
 - [ ] /party start（2 人）：两人被传送进场、背包清空、屏幕出现大字必做任务提示
 
 ## 竞技场结构（原 Task 9 GameTest 的验证内容）
