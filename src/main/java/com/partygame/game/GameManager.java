@@ -7,6 +7,7 @@ import com.partygame.task.TaskAssigner;
 import com.partygame.task.TaskDefinition;
 import com.partygame.task.TaskPool;
 import com.partygame.task.TriggerType;
+import com.partygame.ui.ScoreboardManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
@@ -68,6 +69,10 @@ public class GameManager {
         phase = GamePhase.IDLE;
         states.clear();
         broadcast("游戏已终止");
+        // 手动终止后清掉各客户端残留的计分板内容
+        if (currentLevel != null) {
+            ScoreboardManager.refresh(currentLevel.getServer());
+        }
     }
 
     // ---------- 回合流程 ----------
@@ -115,6 +120,10 @@ public class GameManager {
             case SCORING -> config.scoringSeconds() * 20;
             default -> 0;
         };
+        // 阶段切换后刷新各客户端的计分板视图
+        if (currentLevel != null) {
+            ScoreboardManager.refresh(currentLevel.getServer());
+        }
     }
 
     // 每游戏刻回调：阶段倒计时与切换；由 NeoForge.EVENT_BUS 反射注册
@@ -158,6 +167,10 @@ public class GameManager {
             }
         }
         enterPhase(GamePhase.SCORING);
+        // 分数变化后刷新计分板
+        if (currentLevel != null) {
+            ScoreboardManager.refresh(currentLevel.getServer());
+        }
     }
 
     private boolean anyScoreReached(int target) {
@@ -182,15 +195,18 @@ public class GameManager {
         PlayerState s = states.get(player.getUUID());
         if (s == null || !s.isAlive()) return;
 
+        boolean changed = false;
         // 必做任务判定
         if (!s.isMustDoDone() && s.mustDo().triggers().contains(type)) {
             s.completeMustDo();
             player.sendSystemMessage(Component.literal("§a必做任务已完成！"));
+            changed = true;
         }
         // 禁忌判定
         if (s.triggersMatch(type)) {
             TaskDefinition broken = s.activeForbidden();
             s.triggerForbidden(broken);
+            changed = true;
             if (s.remainingLives() == 0) {
                 eliminate(player, "触犯了禁忌：" + broken.displayName());
             } else {
@@ -198,6 +214,11 @@ public class GameManager {
                         "§c你触犯了禁忌：§l" + broken.displayName() + "§r§c！剩余一条命。"));
                 broadcast(player.getScoreboardName() + " 触犯了一条禁忌");
             }
+        }
+        // 状态有变才刷新计分板（疾跑等每 tick 触发的事件不应每 tick 发包）；
+        // 出局路径由 eliminate() 负责刷新，此处只看仍存活的玩家
+        if (changed && s.isAlive() && currentLevel != null) {
+            ScoreboardManager.refresh(currentLevel.getServer());
         }
     }
 
@@ -224,6 +245,10 @@ public class GameManager {
         s.eliminate();
         broadcast("§c" + player.getScoreboardName() + " 出局了（" + reason + "）");
         player.setGameMode(GameType.SPECTATOR);
+        // 出局状态同步到计分板
+        if (currentLevel != null) {
+            ScoreboardManager.refresh(currentLevel.getServer());
+        }
     }
 
     // ---------- 查询 ----------
