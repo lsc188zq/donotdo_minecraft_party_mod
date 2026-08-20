@@ -1,5 +1,6 @@
 package com.partygame.config;
 
+import com.partygame.map.MapData;
 import com.partygame.task.TaskType;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,24 @@ class ModConfigTest {
         assertEquals(4, config.chestCount());
         assertEquals(2, config.loot("weapons").size());
         assertEquals(4, config.loot("armor").size());
+    }
+
+    @Test
+    void mapsAndSaveWork() throws Exception {
+        Path tempFile = Files.createTempFile("partygame-config-test", ".json");
+        Files.deleteIfExists(tempFile);
+        ModConfig config = ModConfig.load(tempFile);
+
+        assertEquals("procedural", config.selectedMap());
+        config.addMap(new MapData("my_map", MapData.MapType.TEMPLATE, "my_map.nbt", 15));
+        config.setSelectedMap("my_map");
+        config.save();
+
+        // 重新加载后改动仍在（写回生效）
+        ModConfig reloaded = ModConfig.load(tempFile);
+        assertEquals("my_map", reloaded.selectedMap());
+        assertEquals(1, reloaded.maps().size());
+        assertEquals("my_map", reloaded.maps().get(0).name());
     }
 
     @Test

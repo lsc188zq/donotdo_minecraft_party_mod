@@ -52,6 +52,14 @@ public class ArenaGenerator {
                 .setValue(FaceAttachedHorizontalDirectionalBlock.FACE, AttachFace.WALL);
         level.setBlockAndUpdate(new BlockPos(center.getX(), floorY + 1, minZ + 1), button);
 
+        // 出生点标记：地板环形均匀放 8 块红色羊毛，供扫描后随机分配出生点
+        for (int i = 0; i < 8; i++) {
+            double angle = Math.PI * 2 * i / 8;
+            int sx = center.getX() + (int) Math.round((half - 3) * Math.cos(angle));
+            int sz = center.getZ() + (int) Math.round((half - 3) * Math.sin(angle));
+            level.setBlockAndUpdate(new BlockPos(sx, floorY + 1, sz), Blocks.RED_WOOL.defaultBlockState());
+        }
+
         // 东南角地面压力板
         BlockPos plate = new BlockPos(center.getX() + half - 2, floorY + 1, center.getZ() + half - 2);
         level.setBlockAndUpdate(plate, Blocks.STONE_PRESSURE_PLATE.defaultBlockState());

@@ -1,0 +1,80 @@
+package com.partygame.map;
+
+import com.partygame.arena.ArenaGenerator;
+import com.partygame.config.ModConfig;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+
+// 地图落地：程序生成房走生成器；自建地图保存/粘贴结构模板；统一扫描红色羊毛出生点
+public class MapManager {
+    private static final String TEMPLATE_DIR = "config/partygame/maps";
+
+    // 把当前地图落地到以 center 为中心的位置（每回合调用，覆盖区域不恢复）
+    public static void land(ServerLevel level, BlockPos center, ModConfig config, MapData map) {
+        if (map.type() == MapData.MapType.PROCEDURAL) {
+            ArenaGenerator.generate(level, center, config, level.getRandom());
+        } else {
+            pasteTemplate(level, center, map);
+        }
+    }
+
+    // 以玩家站位为中心保存 ±radius 柱形范围（含方块实体，如箱子内容）为模板
+    public static void saveTemplate(ServerLevel level, BlockPos center, int radius, String name) throws IOException {
+        StructureTemplate template = new StructureTemplate();
+        BlockPos from = center.offset(-radius, -radius, -radius);
+        Vec3i size = new Vec3i(radius * 2 + 1, radius * 2 + 1, radius * 2 + 1);
+        // 忽略方块传结构空位：地图里即使有也原样保存
+        template.fillFromWorld(level, from, size, false, List.of(Blocks.STRUCTURE_VOID));
+        Path dir = Paths.get(TEMPLATE_DIR);
+        Files.createDirectories(dir);
+        NbtIo.writeCompressed(template.save(new CompoundTag()), dir.resolve(name + ".nbt"));
+    }
+
+    // 粘贴模板：以 center - radius 为左上角对齐，实现"程序把地图搬进主世界"
+    public static void pasteTemplate(ServerLevel level, BlockPos center, MapData map) {
+        try {
+            Path file = Paths.get(TEMPLATE_DIR, map.template());
+            if (!Files.exists(file)) {
+                throw new IllegalStateException("地图模板不存在：" + map.template());
+            }
+            StructureTemplate template = new StructureTemplate();
+            template.load(level.registryAccess().lookupOrThrow(Registries.BLOCK),
+                    NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()));
+            BlockPos anchor = center.offset(-map.radius(), -map.radius(), -map.radius());
+            template.placeInWorld(level, anchor, anchor, new StructurePlaceSettings(), level.getRandom(), 2);
+        } catch (IOException e) {
+            throw new IllegalStateException("地图模板读取失败：" + map.template(), e);
+        }
+    }
+
+    // 扫描以 center 为中心 ±radius 柱形范围内的红色羊毛（出生点）
+    public static List<BlockPos> scanSpawns(ServerLevel level, BlockPos center, int radius) {
+        List<BlockPos> spawns = new ArrayList<>();
+        for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
+            for (int y = center.getY() - radius; y <= center.getY() + radius; y++) {
+                for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
+                    BlockPos p = new BlockPos(x, y, z);
+                    if (level.getBlockState(p).is(Blocks.RED_WOOL)) {
+                        spawns.add(p);
+                    }
+                }
+            }
+        }
+        return spawns;
+    }
+}

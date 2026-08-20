@@ -2,6 +2,9 @@ package com.partygame.game;
 
 import com.partygame.arena.ArenaGenerator;
 import com.partygame.config.ModConfig;
+import com.partygame.map.MapData;
+import com.partygame.map.MapManager;
+import com.partygame.map.SpawnAssigner;
 import com.partygame.task.Assignment;
 import com.partygame.task.TaskAssigner;
 import com.partygame.task.TaskDefinition;
@@ -34,6 +37,7 @@ public class GameManager {
     private ModConfig config;
     private GamePhase phase = GamePhase.IDLE;
     private int countdownTicks;               // 当前阶段剩余 tick（每秒 20 tick）
+    private int round;                        // 当前第几轮（beginRound 自增）
     private final Map<UUID, PlayerState> states = new HashMap<>();
     private BlockPos arenaCenter;
     private BlockPos platePos;
@@ -48,6 +52,21 @@ public class GameManager {
     }
 
     // ---------- 供命令调用 ----------
+
+    // 配置对象：命令需要读取/修改配置（地图管理、config 命令）
+    public ModConfig config() { return config; }
+
+    // 当前选中的地图：procedural 为内置程序生成房，其余从配置查找
+    public MapData selectedMapData() {
+        String selected = config.selectedMap();
+        if (selected.equals(MapData.PROCEDURAL.name())) {
+            return MapData.PROCEDURAL;
+        }
+        return config.maps().stream()
+                .filter(m -> m.name().equals(selected))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("选中的地图不存在：" + selected));
+    }
 
     public boolean isArenaSet() { return arenaCenter != null; }
     public void setArenaCenter(BlockPos center) { this.arenaCenter = center; }
@@ -80,12 +99,19 @@ public class GameManager {
     // ---------- 回合流程 ----------
 
     private void beginRound() {
-        // 每回合重建竞技场（覆盖区域不恢复），重新摆放装备箱
-        ArenaGenerator.generate(currentLevel, arenaCenter, config, currentLevel.getRandom());
+        round++;
+        // 落地当前地图（程序生成房重建 / 自建地图重新粘贴，恢复被破坏的方块）
+        MapData map = selectedMapData();
+        MapManager.land(currentLevel, arenaCenter, config, map);
+        int scanRadius = map.type() == MapData.MapType.PROCEDURAL ? config.arenaHalfSize() : map.radius();
+        List<BlockPos> spawns = MapManager.scanSpawns(currentLevel, arenaCenter, scanRadius);
+
         List<ServerPlayer> players = currentLevel.getServer().getPlayerList().getPlayers();
         // 上一回合出局的旁观者重新进场参与，分数保留
         TaskPool pool = new TaskPool(config.taskPool());
         List<Assignment> assignments = TaskAssigner.assign(pool, players.size(), random);
+        // 出生点每回合重新随机分配
+        List<BlockPos> spawnPoints = SpawnAssigner.assign(spawns, players.size(), random);
 
         for (int i = 0; i < players.size(); i++) {
             ServerPlayer p = players.get(i);
@@ -101,9 +127,11 @@ public class GameManager {
             // 传送进场、清背包、回生存模式
             p.setGameMode(GameType.SURVIVAL);
             p.getInventory().clearContent();
+            BlockPos spawn = spawnPoints.get(i);
+            // 出生在随机分配的羊毛出生点上方 1 格
             // 21.11.45 的签名带 setCamera 参数；空相对集 = 按绝对坐标传送
             p.teleportTo(currentLevel,
-                    arenaCenter.getX() + 0.5, arenaCenter.getY() + 1.0, arenaCenter.getZ() + 0.5,
+                    spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5,
                     java.util.Set.<Relative>of(), p.getYRot(), p.getXRot(), true);
             p.sendSystemMessage(Component.literal("你的必做任务：§a" + s.mustDo().displayName()));
             // 屏幕大字提示（21.11.45 无 displayTitle 方法，用发包方式）
@@ -111,7 +139,7 @@ public class GameManager {
             p.connection.send(new ClientboundSetSubtitleTextPacket(Component.literal("§a" + s.mustDo().displayName())));
         }
         enterPhase(GamePhase.PREPARING);
-        broadcast("§6准备期开始（30 秒）：抢夺装备，玩家间攻击禁用！");
+        broadcast("§6第 " + round + " 轮准备期开始：抢夺装备，玩家间攻击禁用！");
     }
 
     private void enterPhase(GamePhase next) {

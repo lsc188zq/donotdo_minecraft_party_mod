@@ -1,12 +1,22 @@
 package com.partygame.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import com.partygame.config.ModConfig;
 import com.partygame.game.GameManager;
 import com.partygame.game.PlayerState;
+import com.partygame.map.MapData;
+import com.partygame.map.MapManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -28,7 +38,32 @@ public class PartyCommand {
                         .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .executes(ctx -> stop(ctx.getSource())))
                 .then(Commands.literal("score")
-                        .executes(ctx -> score(ctx.getSource()))));
+                        .executes(ctx -> score(ctx.getSource())))
+                .then(mapCommand()));
+    }
+
+    // /party map 子命令：save/list/remove/choose（独立方法，避免深层嵌套的括号堆叠）
+    private static LiteralArgumentBuilder<CommandSourceStack> mapCommand() {
+        return Commands.literal("map")
+                .then(Commands.literal("save")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("radius", IntegerArgumentType.integer(5, 100))
+                                        .executes(ctx -> mapSave(ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "name"),
+                                                IntegerArgumentType.getInteger(ctx, "radius"))))))
+                .then(Commands.literal("list")
+                        .executes(ctx -> mapList(ctx.getSource())))
+                .then(Commands.literal("remove")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(ctx -> mapRemove(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "name")))))
+                .then(Commands.literal("choose")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .executes(ctx -> mapChoose(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "name")))));
     }
 
     private static int setArena(CommandSourceStack source) {
@@ -36,10 +71,91 @@ public class PartyCommand {
             source.sendFailure(Component.literal("该命令需由玩家站在竞技场中心点执行"));
             return 0;
         }
-        GameManager.get().setArenaCenter(p.blockPosition());
+        GameManager gm = GameManager.get();
+        ModConfig config = gm.config();
+        MapData map = gm.selectedMapData();
+        // 先落地并扫描出生点，数量不足直接拒绝，不记录中心
+        MapManager.land(source.getLevel(), p.blockPosition(), config, map);
+        int scanRadius = map.type() == MapData.MapType.PROCEDURAL ? config.arenaHalfSize() : map.radius();
+        int spawnCount = MapManager.scanSpawns(source.getLevel(), p.blockPosition(), scanRadius).size();
+        if (spawnCount < config.minPlayers()) {
+            source.sendFailure(Component.literal(
+                    "出生点不足：场地内只有 " + spawnCount + " 个红色羊毛，少于 minPlayers(" + config.minPlayers() + ")"));
+            return 0;
+        }
+        gm.setArenaCenter(p.blockPosition());
         source.sendSuccess(() -> Component.literal(
-                "竞技场中心已设为 " + p.blockPosition().toShortString() + "（" +
-                "下次 /party start 时以该点为中心生成场地，会覆盖原有方块）"), true);
+                "竞技场中心已设为 " + p.blockPosition().toShortString() + "，地图 " + map.name()
+                + " 已落地，出生点 " + spawnCount + " 个"), true);
+        return 1;
+    }
+
+    private static int mapSave(CommandSourceStack source, String name, int radius) {
+        if (!(source.getEntity() instanceof ServerPlayer p)) {
+            source.sendFailure(Component.literal("该命令需由玩家站在地图中心点执行"));
+            return 0;
+        }
+        if (name.equals(MapData.PROCEDURAL.name())) {
+            source.sendFailure(Component.literal("该名字被内置程序生成房占用"));
+            return 0;
+        }
+        ModConfig config = GameManager.get().config();
+        try {
+            MapManager.saveTemplate(source.getLevel(), p.blockPosition(), radius, name);
+            config.removeMap(name);
+            config.addMap(new MapData(name, MapData.MapType.TEMPLATE, name + ".nbt", radius));
+            config.setSelectedMap(name);
+            config.save();
+        } catch (Exception e) {
+            source.sendFailure(Component.literal("地图保存失败：" + e.getMessage()));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("地图 " + name + " 已保存（半径 " + radius + "）并选中"), true);
+        return 1;
+    }
+
+    private static int mapList(CommandSourceStack source) {
+        ModConfig config = GameManager.get().config();
+        List<String> lines = new ArrayList<>();
+        lines.add("§6程序生成房（内置）" + (config.selectedMap().equals("procedural") ? " §a[当前]" : ""));
+        for (MapData m : config.maps()) {
+            lines.add(m.name() + "（半径 " + m.radius() + "）" + (config.selectedMap().equals(m.name()) ? " §a[当前]" : ""));
+        }
+        for (String line : lines) {
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        return 1;
+    }
+
+    private static int mapRemove(CommandSourceStack source, String name) {
+        ModConfig config = GameManager.get().config();
+        boolean existed = config.maps().stream().anyMatch(m -> m.name().equals(name));
+        if (!existed) {
+            source.sendFailure(Component.literal("地图不存在：" + name));
+            return 0;
+        }
+        config.removeMap(name);
+        if (config.selectedMap().equals(name)) {
+            config.setSelectedMap(MapData.PROCEDURAL.name());
+        }
+        config.save();
+        // 模板文件删除失败不阻塞命令（残留文件不影响游戏）
+        try { Files.deleteIfExists(Paths.get("config", "partygame", "maps", name + ".nbt")); } catch (IOException ignored) { }
+        source.sendSuccess(() -> Component.literal("地图 " + name + " 已删除"), true);
+        return 1;
+    }
+
+    private static int mapChoose(CommandSourceStack source, String name) {
+        ModConfig config = GameManager.get().config();
+        boolean exists = name.equals(MapData.PROCEDURAL.name())
+                || config.maps().stream().anyMatch(m -> m.name().equals(name));
+        if (!exists) {
+            source.sendFailure(Component.literal("地图不存在：" + name));
+            return 0;
+        }
+        config.setSelectedMap(name);
+        config.save();
+        source.sendSuccess(() -> Component.literal("已选中地图：" + name + "（/party setarena 落地）"), true);
         return 1;
     }
 

@@ -2,7 +2,9 @@ package com.partygame.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.partygame.map.MapData;
 import com.partygame.task.TaskDefinition;
 import com.partygame.task.TaskType;
 import com.partygame.task.TriggerType;
@@ -19,6 +21,7 @@ public class ModConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
     private final JsonObject root;
+    private Path file;
 
     private ModConfig(JsonObject root) {
         this.root = root;
@@ -30,9 +33,24 @@ public class ModConfig {
                 Files.createDirectories(configFile.getParent());
                 Files.writeString(configFile, DefaultConfig.JSON);
             }
-            return new ModConfig(GSON.fromJson(Files.readString(configFile), JsonObject.class));
+            ModConfig config = new ModConfig(GSON.fromJson(Files.readString(configFile), JsonObject.class));
+            config.file = configFile;
+            // 旧配置缺少 maps 字段时补上空数组，避免后续访问 NPE
+            if (!config.root.has("maps")) {
+                config.root.add("maps", new JsonArray());
+            }
+            return config;
         } catch (Exception e) {
             throw new RuntimeException("partygame 配置读取失败: " + configFile, e);
+        }
+    }
+
+    // 把内存中的配置写回原文件（/party config 与地图管理命令修改后调用）
+    public void save() {
+        try {
+            Files.writeString(file, GSON.toJson(root));
+        } catch (Exception e) {
+            throw new RuntimeException("partygame 配置写回失败: " + file, e);
         }
     }
 
@@ -52,6 +70,33 @@ public class ModConfig {
         return root.getAsJsonObject("loot").getAsJsonArray(kind).asList().stream()
                 .map(e -> e.getAsString())
                 .toList();
+    }
+
+    // ---- 地图 ----
+
+    public List<MapData> maps() {
+        return root.getAsJsonArray("maps").asList().stream()
+                .map(e -> MapData.fromJson(e.getAsJsonObject()))
+                .toList();
+    }
+
+    // 当前选中地图名；旧配置缺省为内置程序生成房
+    public String selectedMap() {
+        return root.has("selectedMap") ? root.get("selectedMap").getAsString() : "procedural";
+    }
+
+    public void setSelectedMap(String name) {
+        root.addProperty("selectedMap", name);
+    }
+
+    public void addMap(MapData map) {
+        root.getAsJsonArray("maps").add(map.toJson());
+    }
+
+    // 删除地图登记；不存在时静默返回（模板文件由调用方删除）
+    public void removeMap(String name) {
+        root.getAsJsonArray("maps").asList()
+                .removeIf(e -> e.getAsJsonObject().get("name").getAsString().equals(name));
     }
 
     // 任务池：解析配置里的 "triggers" 字符串为 TriggerType 枚举，
