@@ -99,9 +99,42 @@ public class ModConfig {
                 .removeIf(e -> e.getAsJsonObject().get("name").getAsString().equals(name));
     }
 
-    // 任务池：解析配置里的 "triggers" 字符串为 TriggerType 枚举，
-    // 名称写错（与枚举不符）会在加载时抛异常，尽早暴露配置错误
-    public List<TaskDefinition> taskPool() {
+    // ---- 可调的整型配置（/party config set）----
+
+    // 可调的整型配置键：键名 → 路径写法
+    private static final List<String> INT_KEYS = List.of(
+            "minPlayers", "preparingSeconds", "playingSeconds", "scoringSeconds", "targetScore");
+
+    public List<String> intKeys() { return INT_KEYS; }
+
+    public int getInt(String key) {
+        return switch (key) {
+            case "minPlayers" -> minPlayers();
+            case "preparingSeconds" -> preparingSeconds();
+            case "playingSeconds" -> playingSeconds();
+            case "scoringSeconds" -> scoringSeconds();
+            case "targetScore" -> targetScore();
+            default -> throw new IllegalArgumentException("未知配置项：" + key);
+        };
+    }
+
+    // 修改整型配置并写回文件；对局中的时长类修改下一回合生效
+    public void setInt(String key, int value) {
+        switch (key) {
+            case "minPlayers" -> root.addProperty("minPlayers", value);
+            case "preparingSeconds" -> root.getAsJsonObject("durations").addProperty("preparingSeconds", value);
+            case "playingSeconds" -> root.getAsJsonObject("durations").addProperty("playingSeconds", value);
+            case "scoringSeconds" -> root.getAsJsonObject("durations").addProperty("scoringSeconds", value);
+            case "targetScore" -> root.addProperty("targetScore", value);
+            default -> throw new IllegalArgumentException("未知配置项：" + key);
+        }
+        save();
+    }
+
+    // ---- 任务池 ----
+
+    // 任务池原始解析（不过滤 enabled）：任务启停判断与全量展示共用
+    private List<TaskDefinition> taskPoolRaw() {
         return root.getAsJsonArray("taskPool").asList().stream()
                 .map(e -> {
                     JsonObject o = e.getAsJsonObject();
@@ -115,5 +148,43 @@ public class ModConfig {
                             o.get("displayName").getAsString());
                 })
                 .toList();
+    }
+
+    // 任务池（仅启用项，供分配器使用）；旧配置无 enabled 字段视为启用
+    // 解析配置里的 "triggers" 字符串为 TriggerType 枚举，
+    // 名称写错（与枚举不符）会在加载时抛异常，尽早暴露配置错误
+    public List<TaskDefinition> taskPool() {
+        return taskPoolRaw().stream()
+                .filter(t -> taskEnabled(t.id()))
+                .toList();
+    }
+
+    // 任务池（全部任务，供 /party tasks list 展示含禁用项的完整列表）
+    public List<TaskDefinition> taskPoolAll() {
+        return taskPoolRaw();
+    }
+
+    // 任务是否启用；旧配置无 enabled 字段视为启用
+    public boolean taskEnabled(String id) {
+        for (var e : root.getAsJsonArray("taskPool")) {
+            JsonObject o = e.getAsJsonObject();
+            if (o.get("id").getAsString().equals(id)) {
+                return !o.has("enabled") || o.get("enabled").getAsBoolean();
+            }
+        }
+        throw new IllegalArgumentException("任务不存在：" + id);
+    }
+
+    // 启用/禁用任务并写回；未知任务 id 抛异常
+    public void setTaskEnabled(String id, boolean enabled) {
+        for (var e : root.getAsJsonArray("taskPool")) {
+            JsonObject o = e.getAsJsonObject();
+            if (o.get("id").getAsString().equals(id)) {
+                o.addProperty("enabled", enabled);
+                save();
+                return;
+            }
+        }
+        throw new IllegalArgumentException("任务不存在：" + id);
     }
 }

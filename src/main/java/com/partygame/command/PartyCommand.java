@@ -17,6 +17,7 @@ import com.partygame.game.GameManager;
 import com.partygame.game.PlayerState;
 import com.partygame.map.MapData;
 import com.partygame.map.MapManager;
+import com.partygame.task.TaskDefinition;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -39,7 +40,9 @@ public class PartyCommand {
                         .executes(ctx -> stop(ctx.getSource())))
                 .then(Commands.literal("score")
                         .executes(ctx -> score(ctx.getSource())))
-                .then(mapCommand()));
+                .then(mapCommand())
+                .then(configCommand())
+                .then(tasksCommand()));
     }
 
     // /party map 子命令：save/list/remove/choose（独立方法，避免深层嵌套的括号堆叠）
@@ -64,6 +67,37 @@ public class PartyCommand {
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(ctx -> mapChoose(ctx.getSource(),
                                         StringArgumentType.getString(ctx, "name")))));
+    }
+
+    // /party config 子命令：show 查看 / set 修改整型配置并写回
+    private static LiteralArgumentBuilder<CommandSourceStack> configCommand() {
+        return Commands.literal("config")
+                .then(Commands.literal("show")
+                        .executes(ctx -> configShow(ctx.getSource())))
+                .then(Commands.literal("set")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("key", StringArgumentType.word())
+                                .then(Commands.argument("value", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> configSet(ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "key"),
+                                                IntegerArgumentType.getInteger(ctx, "value"))))));
+    }
+
+    // /party tasks 子命令：list 查看全部任务 / enable|disable 启停任务并写回
+    private static LiteralArgumentBuilder<CommandSourceStack> tasksCommand() {
+        return Commands.literal("tasks")
+                .then(Commands.literal("list")
+                        .executes(ctx -> tasksList(ctx.getSource())))
+                .then(Commands.literal("enable")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .executes(ctx -> tasksSet(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "id"), true))))
+                .then(Commands.literal("disable")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .executes(ctx -> tasksSet(ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "id"), false))));
     }
 
     private static int setArena(CommandSourceStack source) {
@@ -156,6 +190,51 @@ public class PartyCommand {
         config.setSelectedMap(name);
         config.save();
         source.sendSuccess(() -> Component.literal("已选中地图：" + name + "（/party setarena 落地）"), true);
+        return 1;
+    }
+
+    private static int configShow(CommandSourceStack source) {
+        ModConfig config = GameManager.get().config();
+        source.sendSuccess(() -> Component.literal("§6===== 配置 ====="), false);
+        for (String key : config.intKeys()) {
+            String line = key + " = " + config.getInt(key);
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+        return 1;
+    }
+
+    private static int configSet(CommandSourceStack source, String key, int value) {
+        ModConfig config = GameManager.get().config();
+        try {
+            config.setInt(key, value);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.literal(e.getMessage()));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("已设置 " + key + " = " + value + "（已写回配置文件）"), true);
+        return 1;
+    }
+
+    private static int tasksList(CommandSourceStack source) {
+        ModConfig config = GameManager.get().config();
+        source.sendSuccess(() -> Component.literal("§6===== 任务池 ====="), false);
+        for (TaskDefinition t : config.taskPoolAll()) {
+            String disabled = config.taskEnabled(t.id()) ? "" : " §8[已禁用]";
+            source.sendSuccess(() -> Component.literal(
+                    t.id() + " §7[" + t.type() + "] " + t.displayName() + disabled), false);
+        }
+        return 1;
+    }
+
+    private static int tasksSet(CommandSourceStack source, String id, boolean enabled) {
+        ModConfig config = GameManager.get().config();
+        try {
+            config.setTaskEnabled(id, enabled);
+        } catch (IllegalArgumentException e) {
+            source.sendFailure(Component.literal(e.getMessage()));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("任务 " + id + " 已" + (enabled ? "启用" : "禁用")), true);
         return 1;
     }
 

@@ -69,4 +69,34 @@ class ModConfigTest {
         long mustDos = config.taskPool().stream().filter(t -> t.type() == TaskType.MUST_DO).count();
         assertEquals(5, mustDos);
     }
+
+    @Test
+    void setIntWritesBackAndReloads() throws Exception {
+        Path tempFile = Files.createTempFile("partygame-config-test", ".json");
+        Files.deleteIfExists(tempFile);
+        ModConfig config = ModConfig.load(tempFile);
+
+        config.setInt("minPlayers", 1);
+        config.setInt("playingSeconds", 120);
+
+        ModConfig reloaded = ModConfig.load(tempFile);
+        assertEquals(1, reloaded.minPlayers());
+        assertEquals(120, reloaded.playingSeconds());
+    }
+
+    @Test
+    void disabledTasksAreFilteredAndTogglePersists() throws Exception {
+        Path tempFile = Files.createTempFile("partygame-config-test", ".json");
+        Files.deleteIfExists(tempFile);
+        ModConfig config = ModConfig.load(tempFile);
+
+        int all = config.taskPool().size();
+        config.setTaskEnabled("press_button", false);
+        config.save();
+
+        ModConfig reloaded = ModConfig.load(tempFile);
+        assertFalse(reloaded.taskEnabled("press_button"));
+        assertEquals(all - 1, reloaded.taskPool().size()); // 禁用项被过滤
+        assertTrue(reloaded.taskPool().stream().noneMatch(t -> t.id().equals("press_button")));
+    }
 }
