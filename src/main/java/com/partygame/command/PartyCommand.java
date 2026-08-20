@@ -151,6 +151,10 @@ public class PartyCommand {
             return 0;
         }
         ModConfig config = GameManager.get().config();
+        if (config.builtinMaps().stream().anyMatch(m -> m.name().equals(name))) {
+            source.sendFailure(Component.literal("该名字与内置地图冲突"));
+            return 0;
+        }
         // 出生点预检查：保存前统计区域内红色羊毛，不足 minPlayers 时在反馈里追加警告（不阻断保存）
         int spawnCount = MapManager.scanSpawns(source.getLevel(), p.blockPosition(), radius).size();
         try {
@@ -203,6 +207,10 @@ public class PartyCommand {
         ModConfig config = GameManager.get().config();
         List<String> lines = new ArrayList<>();
         lines.add("§6程序生成房（内置）" + (config.selectedMap().equals("procedural") ? " §a[当前]" : ""));
+        for (MapData m : config.builtinMaps()) {
+            lines.add("§b" + m.name() + "（半径 " + m.radius() + "）[内置]"
+                    + (config.selectedMap().equals(m.name()) ? " §a[当前]" : ""));
+        }
         for (MapData m : config.maps()) {
             lines.add(m.name() + "（半径 " + m.radius() + "）" + (config.selectedMap().equals(m.name()) ? " §a[当前]" : ""));
         }
@@ -214,6 +222,10 @@ public class PartyCommand {
 
     private static int mapRemove(CommandSourceStack source, String name) {
         ModConfig config = GameManager.get().config();
+        if (config.builtinMaps().stream().anyMatch(m -> m.name().equals(name))) {
+            source.sendFailure(Component.literal("内置地图不可删除：" + name));
+            return 0;
+        }
         boolean existed = config.maps().stream().anyMatch(m -> m.name().equals(name));
         if (!existed) {
             source.sendFailure(Component.literal("地图不存在：" + name));
@@ -233,6 +245,7 @@ public class PartyCommand {
     private static int mapChoose(CommandSourceStack source, String name) {
         ModConfig config = GameManager.get().config();
         boolean exists = name.equals(MapData.PROCEDURAL.name())
+                || config.builtinMaps().stream().anyMatch(m -> m.name().equals(name))
                 || config.maps().stream().anyMatch(m -> m.name().equals(name));
         if (!exists) {
             source.sendFailure(Component.literal("地图不存在：" + name));

@@ -56,15 +56,18 @@ public class GameManager {
     // 配置对象：命令需要读取/修改配置（地图管理、config 命令）
     public ModConfig config() { return config; }
 
-    // 当前选中的地图：procedural 为内置程序生成房，其余从配置查找
+    // 当前选中的地图：procedural 为内置程序生成房，其次查内置地图（随 mod 打包），最后查自建地图
     public MapData selectedMapData() {
         String selected = config.selectedMap();
         if (selected.equals(MapData.PROCEDURAL.name())) {
             return MapData.PROCEDURAL;
         }
-        return config.maps().stream()
+        return config.builtinMaps().stream()
                 .filter(m -> m.name().equals(selected))
                 .findFirst()
+                .or(() -> config.maps().stream()
+                        .filter(m -> m.name().equals(selected))
+                        .findFirst())
                 .orElseThrow(() -> new IllegalStateException("选中的地图不存在：" + selected));
     }
 

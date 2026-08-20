@@ -17,6 +17,7 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
 import net.minecraft.world.phys.AABB;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,17 +83,35 @@ public class MapManager {
     // 粘贴模板：以 center - radius 为左上角对齐，实现"程序把地图搬进主世界"
     public static void pasteTemplate(ServerLevel level, BlockPos center, MapData map) {
         try {
-            Path file = Paths.get(TEMPLATE_DIR, map.template());
-            if (!Files.exists(file)) {
-                throw new IllegalStateException("地图模板不存在：" + map.template());
-            }
+            // 内置地图从 jar 资源读取（随 mod 打包），自建地图从 config 目录读取
+            CompoundTag tag = map.builtin()
+                    ? readBuiltinTemplate(map.template())
+                    : readSavedTemplate(map.template());
             StructureTemplate template = new StructureTemplate();
-            template.load(level.registryAccess().lookupOrThrow(Registries.BLOCK),
-                    NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()));
+            template.load(level.registryAccess().lookupOrThrow(Registries.BLOCK), tag);
             BlockPos anchor = center.offset(-map.radius(), -map.radius(), -map.radius());
             template.placeInWorld(level, anchor, anchor, new StructurePlaceSettings(), level.getRandom(), 2);
         } catch (IOException e) {
             throw new IllegalStateException("地图模板读取失败：" + map.template(), e);
+        }
+    }
+
+    // 读取自建地图模板（config/partygame/maps/ 目录）
+    private static CompoundTag readSavedTemplate(String name) throws IOException {
+        Path file = Paths.get(TEMPLATE_DIR, name);
+        if (!Files.exists(file)) {
+            throw new IllegalStateException("地图模板不存在：" + name);
+        }
+        return NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
+    }
+
+    // 从 jar 资源读取内置地图模板
+    private static CompoundTag readBuiltinTemplate(String name) throws IOException {
+        try (InputStream in = MapManager.class.getResourceAsStream("/partygame/maps/" + name)) {
+            if (in == null) {
+                throw new IllegalStateException("内置地图资源不存在：" + name);
+            }
+            return NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
         }
     }
 

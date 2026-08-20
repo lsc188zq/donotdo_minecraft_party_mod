@@ -64,3 +64,17 @@
 - `/party tasks list` —— 查看全部任务与启用状态
 - `/party tasks disable <id>` —— 禁用任务（写回配置文件）
 - `/party tasks enable <id>` —— 启用任务（写回配置文件）
+
+## 内置地图发布流程（随 mod 打包分发）
+
+内置地图 = 模板打包在 mod jar 里，所有安装者开箱即用、不可删除。发布新内置地图：
+
+1. **游戏内建图**：用建图辅助（`/party map preview` / `/party map platform` / WorldEdit）搭好地图，确认红色羊毛出生点 ≥ `minPlayers` 个，站在中心执行 `/party map save <名字> <半径>`
+2. **复制模板**：把 `run/config/partygame/maps/<名字>.nbt` 复制到 `src/main/resources/partygame/maps/`
+3. **登记**：两处同步添加（**缺一不可**）：
+   - `DefaultConfig.JSON` 文本里 `builtinMaps` 数组加一条：`{ "name": "xxx", "type": "TEMPLATE", "template": "xxx.nbt", "radius": 20, "builtin": true }`
+   - `DefaultConfig.DEFAULT_BUILTIN_MAPS` Java 列表加同一条（旧配置文件回填用）
+4. **验证**：`./gradlew compileJava test` 通过；游戏内 `/party map list` 看到 `[内置]` 标注，`choose` 后 `setarena` 能落地
+5. **打包**：`./gradlew jar`，用 `unzip -l build/libs/*.jar` 确认 `partygame/maps/<名字>.nbt` 在 jar 内
+
+注意：`/party map save` 的名字不能与内置地图重名；`/party map remove` 拒绝删除内置地图。移除一张内置图需要同时删资源文件与两处登记后重新发布。

@@ -1,14 +1,27 @@
 package com.partygame.config;
 
+import com.partygame.map.MapData;
+
+import java.util.List;
+
 // 默认配置内容：首次运行时由 ModConfig 写入 config/partygame.json
 public class DefaultConfig {
+
+    // 内置地图默认登记（Java 侧，供旧配置回填使用）；
+    // 与下方 JSON 文本里的 builtinMaps 数组保持同步——新增内置地图时两处都要加
+    public static final List<MapData> DEFAULT_BUILTIN_MAPS = List.of(
+            new MapData("mixhouse", MapData.MapType.TEMPLATE, "mixhouse.nbt", 60, true));
+
     public static final String JSON = """
         {
           "durations": { "preparingSeconds": 30, "playingSeconds": 180, "scoringSeconds": 10 },
           "targetScore": 5,
           "minPlayers": 2,
           "maps": [],
-          "selectedMap": "procedural",
+          "selectedMap": "mixhouse",
+          "builtinMaps": [
+            { "name": "mixhouse", "type": "TEMPLATE", "template": "mixhouse.nbt", "radius": 60, "builtin": true }
+          ],
           "protectedBlocks": ["minecraft:stone_bricks", "minecraft:red_wool", "minecraft:chest"],
           "arena": { "halfSize": 15, "wallHeight": 3 },
           "taskPool": [
