@@ -89,6 +89,7 @@ public class GameManager {
     public void stopGame() {
         phase = GamePhase.IDLE;
         states.clear();
+        round = 0;
         broadcast("游戏已终止");
         // 手动终止后清掉各客户端残留的计分板内容
         if (currentLevel != null) {
@@ -215,7 +216,13 @@ public class GameManager {
             broadcast("§6" + (p != null ? p.getScoreboardName() : "?") + " 率先达到 "
                     + config.targetScore() + " 分，获得胜利！");
         }
-        phase = GamePhase.FINISHED;
+        // 结束回 IDLE 并清空状态：下次 /party start 是全新一局
+        phase = GamePhase.IDLE;
+        states.clear();
+        round = 0;
+        if (currentLevel != null) {
+            ScoreboardManager.refresh(currentLevel.getServer());
+        }
     }
 
     // ---------- 供事件监听器调用 ----------
@@ -279,6 +286,14 @@ public class GameManager {
         // 出局状态同步到计分板
         if (currentLevel != null) {
             ScoreboardManager.refresh(currentLevel.getServer());
+        }
+        // 对局中全员出局 → 立即结束本回合（无人得分），结算后自动进入下一回合；
+        // "服务器仍有玩家在线"区分全员掉线：掉线走 onPlayerLeave 的 stopGame 回 IDLE
+        if (phase == GamePhase.PLAYING
+                && !currentLevel.getServer().getPlayerList().getPlayers().isEmpty()
+                && states.values().stream().noneMatch(PlayerState::isAlive)) {
+            broadcast("§c全军覆没！本回合无人得分");
+            endRound();
         }
     }
 
