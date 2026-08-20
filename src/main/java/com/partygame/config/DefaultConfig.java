@@ -7,10 +7,10 @@ import java.util.List;
 // 默认配置内容：首次运行时由 ModConfig 写入 config/partygame.json
 public class DefaultConfig {
 
-    // 内置地图默认登记（Java 侧，供旧配置回填使用）；
-    // 与下方 JSON 文本里的 builtinMaps 数组保持同步——新增内置地图时两处都要加
+    // 内置地图登记（唯一来源：随 mod 代码打包，不写进配置文件——
+    // 写进配置会因旧文件残留导致 mod 更新后仍显示过期内容）
     public static final List<MapData> DEFAULT_BUILTIN_MAPS = List.of(
-            new MapData("mixhouse", MapData.MapType.TEMPLATE, "mixhouse.nbt", 60, true));
+            new MapData("mixhouse2", MapData.MapType.TEMPLATE, "mixhouse2.nbt", 30, true));
 
     public static final String JSON = """
         {
@@ -18,10 +18,7 @@ public class DefaultConfig {
           "targetScore": 5,
           "minPlayers": 2,
           "maps": [],
-          "selectedMap": "mixhouse",
-          "builtinMaps": [
-            { "name": "mixhouse", "type": "TEMPLATE", "template": "mixhouse.nbt", "radius": 60, "builtin": true }
-          ],
+          "selectedMap": "mixhouse2",
           "protectedBlocks": ["minecraft:stone_bricks", "minecraft:red_wool", "minecraft:chest"],
           "arena": { "halfSize": 15, "wallHeight": 3 },
           "taskPool": [

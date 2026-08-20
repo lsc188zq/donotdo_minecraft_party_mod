@@ -38,7 +38,7 @@ public class ModConfig {
             }
             ModConfig config = new ModConfig(GSON.fromJson(Files.readString(configFile), JsonObject.class));
             config.file = configFile;
-            // 旧配置缺少 maps/protectedBlocks/builtinMaps 字段时补默认值，避免后续访问 NPE
+            // 旧配置缺少 maps/protectedBlocks 字段时补默认值，避免后续访问 NPE
             if (!config.root.has("maps")) {
                 config.root.add("maps", new JsonArray());
             }
@@ -48,9 +48,6 @@ public class ModConfig {
                     blocks.add(id);
                 }
                 config.root.add("protectedBlocks", blocks);
-            }
-            if (!config.root.has("builtinMaps")) {
-                config.root.add("builtinMaps", GSON.toJsonTree(DefaultConfig.DEFAULT_BUILTIN_MAPS));
             }
             return config;
         } catch (Exception e) {
@@ -112,11 +109,9 @@ public class ModConfig {
                 .removeIf(e -> e.getAsJsonObject().get("name").getAsString().equals(name));
     }
 
-    // 内置地图（随 mod 打包分发，不可删除）；模板从 jar 资源读取
+    // 内置地图（随 mod 打包分发，不可删除）；由 mod 代码定义，不读取配置文件
     public List<MapData> builtinMaps() {
-        return root.getAsJsonArray("builtinMaps").asList().stream()
-                .map(e -> MapData.fromJson(e.getAsJsonObject()))
-                .toList();
+        return DefaultConfig.DEFAULT_BUILTIN_MAPS;
     }
 
     // 游戏期间不可破坏的方块 id 名单；id 写错启动即抛异常，尽早暴露配置错误

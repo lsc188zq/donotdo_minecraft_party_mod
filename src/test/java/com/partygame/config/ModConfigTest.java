@@ -36,8 +36,8 @@ class ModConfigTest {
         Files.deleteIfExists(tempFile);
         ModConfig config = ModConfig.load(tempFile);
 
-        // 默认选中内置地图 mixhouse
-        assertEquals("mixhouse", config.selectedMap());
+        // 默认选中内置地图 mixhouse2
+        assertEquals("mixhouse2", config.selectedMap());
         config.addMap(new MapData("my_map", MapData.MapType.TEMPLATE, "my_map.nbt", 15));
         config.setSelectedMap("my_map");
         config.save();
@@ -72,21 +72,22 @@ class ModConfigTest {
     }
 
     @Test
-    void builtinMapsLoadedAndBackfilled() throws Exception {
+    void builtinMapsAlwaysComeFromMod() throws Exception {
         Path tempFile = Files.createTempFile("partygame-config-test", ".json");
         Files.deleteIfExists(tempFile);
         ModConfig config = ModConfig.load(tempFile);
 
-        // 默认配置带内置地图登记，标记 builtin=true（模板从 jar 资源读取）
+        // 内置地图由 mod 代码定义，标记 builtin=true（模板从 jar 资源读取）
         assertEquals(1, config.builtinMaps().size());
         assertTrue(config.builtinMaps().get(0).builtin());
+        assertEquals("mixhouse2", config.builtinMaps().get(0).name());
 
-        // 旧配置缺 builtinMaps 字段时自动回填默认内置地图
+        // 旧配置（无任何地图相关字段）同样获得当前内置地图列表——不依赖配置文件内容
         Path oldFile = Files.createTempFile("partygame-config-test-old", ".json");
         Files.writeString(oldFile, "{ \"targetScore\": 5 }");
         ModConfig old = ModConfig.load(oldFile);
         assertEquals(1, old.builtinMaps().size());
-        assertEquals("mixhouse", old.builtinMaps().get(0).name());
+        assertEquals("mixhouse2", old.builtinMaps().get(0).name());
     }
 
     @Test

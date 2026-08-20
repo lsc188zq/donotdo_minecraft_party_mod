@@ -1,5 +1,6 @@
 package com.partygame.game;
 
+import com.mojang.logging.LogUtils;
 import com.partygame.arena.ArenaGenerator;
 import com.partygame.config.ModConfig;
 import com.partygame.map.MapData;
@@ -21,6 +22,7 @@ import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.GameType;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +35,7 @@ import java.util.UUID;
 public class GameManager {
     private static final GameManager INSTANCE = new GameManager();
     public static GameManager get() { return INSTANCE; }
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private ModConfig config;
     private GamePhase phase = GamePhase.IDLE;
@@ -56,19 +59,27 @@ public class GameManager {
     // 配置对象：命令需要读取/修改配置（地图管理、config 命令）
     public ModConfig config() { return config; }
 
-    // 当前选中的地图：procedural 为内置程序生成房，其次查内置地图（随 mod 打包），最后查自建地图
+    // 当前选中的地图：procedural 为内置程序生成房，其次查内置地图（随 mod 打包），最后查自建地图；
+    // 选中的地图已不存在（旧配置残留/旧 mod 版本）时回退程序生成房并写回配置，不抛异常
     public MapData selectedMapData() {
         String selected = config.selectedMap();
         if (selected.equals(MapData.PROCEDURAL.name())) {
             return MapData.PROCEDURAL;
         }
-        return config.builtinMaps().stream()
+        MapData found = config.builtinMaps().stream()
                 .filter(m -> m.name().equals(selected))
                 .findFirst()
                 .or(() -> config.maps().stream()
                         .filter(m -> m.name().equals(selected))
                         .findFirst())
-                .orElseThrow(() -> new IllegalStateException("选中的地图不存在：" + selected));
+                .orElse(null);
+        if (found != null) {
+            return found;
+        }
+        LOGGER.warn("选中的地图不存在，回退到程序生成房：{}", selected);
+        config.setSelectedMap(MapData.PROCEDURAL.name());
+        config.save();
+        return MapData.PROCEDURAL;
     }
 
     public boolean isArenaSet() { return arenaCenter != null; }
