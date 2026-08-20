@@ -36,10 +36,14 @@ public class ScoreboardManager {
                         }
                         return new SyncStatesPayload.Row(
                                 gm.playerNameOf(s), taboo,
-                                s.remainingLives(), s.score(), self);
+                                s.remainingLives(), s.score(), self, s.isMustDoDone());
                     })
                     .toList();
-            viewer.connection.send(new ClientboundCustomPayloadPacket(new SyncStatesPayload(rows)));
+            String myMustDo = gm.mustDoTextOf(viewer);
+            boolean myDone = gm.stateOf(viewer) != null && gm.stateOf(viewer).isMustDoDone();
+            viewer.connection.send(new ClientboundCustomPayloadPacket(new SyncStatesPayload(
+                    gm.round(), gm.phaseLabel(), gm.countdownSeconds(),
+                    myMustDo, myDone, rows)));
         }
     }
 }

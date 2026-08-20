@@ -49,6 +49,6 @@ public class PartyGame {
         event.registrar("1").playToClient(
                 SyncStatesPayload.TYPE,
                 SyncStatesPayload.STREAM_CODEC,
-                (payload, context) -> context.enqueueWork(() -> PartyHud.apply(payload.rows())));
+                (payload, context) -> context.enqueueWork(() -> PartyHud.apply(payload)));
     }
 }

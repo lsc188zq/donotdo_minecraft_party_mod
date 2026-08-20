@@ -230,6 +230,7 @@ public class GameManager {
         if (!s.isMustDoDone() && s.mustDo().triggers().contains(type)) {
             s.completeMustDo();
             player.sendSystemMessage(Component.literal("§a必做任务已完成！"));
+            broadcast("§a" + player.getScoreboardName() + " 完成了必做任务！");
             changed = true;
         }
         // 禁忌判定
@@ -282,6 +283,30 @@ public class GameManager {
     }
 
     // ---------- 查询 ----------
+
+    public int round() { return round; }
+
+    // 当前阶段剩余秒数（向上取整），供客户端 HUD 显示
+    public int countdownSeconds() {
+        return (countdownTicks + 19) / 20;
+    }
+
+    // 阶段的中文显示名
+    public String phaseLabel() {
+        return switch (phase) {
+            case IDLE -> "等待开局";
+            case PREPARING -> "准备期";
+            case PLAYING -> "对局";
+            case SCORING -> "结算";
+            case FINISHED -> "已结束";
+        };
+    }
+
+    // 该玩家视角的必做任务文本（未入局返回空串）
+    public String mustDoTextOf(ServerPlayer player) {
+        PlayerState s = states.get(player.getUUID());
+        return s == null ? "" : s.mustDo().displayName();
+    }
 
     public PlayerState stateOf(ServerPlayer player) { return states.get(player.getUUID()); }
     public List<PlayerState> allStates() { return new ArrayList<>(states.values()); }
