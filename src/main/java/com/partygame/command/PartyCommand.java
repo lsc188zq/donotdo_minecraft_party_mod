@@ -45,7 +45,7 @@ public class PartyCommand {
                 .then(tasksCommand()));
     }
 
-    // /party map 子命令：save/list/remove/choose（独立方法，避免深层嵌套的括号堆叠）
+    // /party map 子命令：save/list/remove/choose/preview/platform（独立方法，避免深层嵌套的括号堆叠）
     private static LiteralArgumentBuilder<CommandSourceStack> mapCommand() {
         return Commands.literal("map")
                 .then(Commands.literal("save")
@@ -66,7 +66,24 @@ public class PartyCommand {
                         .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(ctx -> mapChoose(ctx.getSource(),
-                                        StringArgumentType.getString(ctx, "name")))));
+                                        StringArgumentType.getString(ctx, "name")))))
+                .then(previewCommand())
+                .then(Commands.literal("platform")
+                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .then(Commands.argument("radius", IntegerArgumentType.integer(5, 100))
+                                .executes(ctx -> mapPlatform(ctx.getSource(),
+                                        IntegerArgumentType.getInteger(ctx, "radius")))));
+    }
+
+    // /party map preview 子命令：radius 放置范围标记 / clear 清除标记（建图辅助）
+    private static LiteralArgumentBuilder<CommandSourceStack> previewCommand() {
+        return Commands.literal("preview")
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .then(Commands.argument("radius", IntegerArgumentType.integer(5, 100))
+                        .executes(ctx -> mapPreview(ctx.getSource(),
+                                IntegerArgumentType.getInteger(ctx, "radius"))))
+                .then(Commands.literal("clear")
+                        .executes(ctx -> mapPreviewClear(ctx.getSource())));
     }
 
     // /party config 子命令：show 查看 / set 修改整型配置并写回
@@ -134,6 +151,8 @@ public class PartyCommand {
             return 0;
         }
         ModConfig config = GameManager.get().config();
+        // 出生点预检查：保存前统计区域内红色羊毛，不足 minPlayers 时在反馈里追加警告（不阻断保存）
+        int spawnCount = MapManager.scanSpawns(source.getLevel(), p.blockPosition(), radius).size();
         try {
             MapManager.saveTemplate(source.getLevel(), p.blockPosition(), radius, name);
             config.removeMap(name);
@@ -144,7 +163,39 @@ public class PartyCommand {
             source.sendFailure(Component.literal("地图保存失败：" + e.getMessage()));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal("地图 " + name + " 已保存（半径 " + radius + "）并选中"), true);
+        String spawnNote = spawnCount < config.minPlayers()
+                ? " §c⚠ 出生点仅 " + spawnCount + " 个，少于 minPlayers(" + config.minPlayers() + ")，setarena 落地会被拒绝"
+                : "（出生点 " + spawnCount + " 个）";
+        source.sendSuccess(() -> Component.literal("地图 " + name + " 已保存（半径 " + radius + "）并选中" + spawnNote), true);
+        return 1;
+    }
+
+    private static int mapPreview(CommandSourceStack source, int radius) {
+        if (!(source.getEntity() instanceof ServerPlayer p)) {
+            source.sendFailure(Component.literal("该命令需由玩家站在地图中心点执行"));
+            return 0;
+        }
+        MapManager.placePreviewMarkers(source.getLevel(), p.blockPosition(), radius);
+        source.sendSuccess(() -> Component.literal(
+                "已标记半径 " + radius + " 的保存范围：四角玻璃在边界外一圈，中心荧石为保存点；"
+                + "保存范围是 ±" + radius + " 的立方（含高度）；建完用 /party map preview clear 清除标记"), true);
+        return 1;
+    }
+
+    private static int mapPreviewClear(CommandSourceStack source) {
+        MapManager.clearPreviewMarkers(source.getLevel());
+        source.sendSuccess(() -> Component.literal("预览标记已清除"), true);
+        return 1;
+    }
+
+    private static int mapPlatform(CommandSourceStack source, int radius) {
+        if (!(source.getEntity() instanceof ServerPlayer p)) {
+            source.sendFailure(Component.literal("该命令需由玩家站在平地中心点执行"));
+            return 0;
+        }
+        MapManager.flatten(source.getLevel(), p.blockPosition(), radius);
+        source.sendSuccess(() -> Component.literal(
+                "已平整半径 " + radius + " 的区域并铺设石砖地板（脚下层）"), true);
         return 1;
     }
 

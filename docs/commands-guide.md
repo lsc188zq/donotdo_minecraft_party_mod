@@ -22,6 +22,9 @@
 | `/party map list` | 所有人 | 列出可用地图，标注当前选中 |
 | `/party map remove <名字>` | 管理员 | 删除自建地图 |
 | `/party map choose <名字>` | 管理员 | 切换当前地图（下次 setarena/每回合生效） |
+| `/party map preview <半径>` | 管理员 | 标记保存范围（建图辅助） |
+| `/party map preview clear` | 管理员 | 清除范围标记 |
+| `/party map platform <半径>` | 管理员 | 一键平整场地并铺石砖地板（建图辅助） |
 | `/party config show` | 所有人 | 查看当前配置 |
 | `/party config set <键> <值>` | 管理员 | 修改配置并写回配置文件 |
 | `/party tasks list` | 所有人 | 查看全部任务（含禁用项） |
@@ -65,6 +68,15 @@
 - 半径范围：5–100
 - 名字不能是 `procedural`（被内置程序生成房占用）
 - 模板里放红色羊毛 = 出生点（建议至少放 `minPlayers` 个）
+- 保存时自动预检查出生点：羊毛不足 `minPlayers` 时照常保存，但反馈里追加警告（"setarena 落地会被拒绝"）
+
+### /party map preview <半径> / preview clear
+
+建图辅助：以玩家站位为中心标记保存范围——**四角玻璃**放在边界外一圈（不会混进模板），**中心荧石**是保存点。注意保存范围是 ±半径的**立方**（含高度），标记只标 X/Z 平面。建完用 `preview clear` 清除标记（只删标记块，不误删你后来放的其他方块；服务器重启后标记记录丢失，残留玻璃需手动拆）。
+
+### /party map platform <半径>
+
+建图辅助：以玩家站位为中心，清空区域内全部方块与掉落物，在脚下 Y-1 层铺满石砖地板，作为搭图基座。
 
 ### /party map list
 

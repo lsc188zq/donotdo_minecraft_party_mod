@@ -11,6 +11,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.phys.AABB;
@@ -20,7 +21,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 // 地图落地：程序生成房走生成器；自建地图保存/粘贴结构模板；统一扫描红色羊毛出生点
 public class MapManager {
@@ -90,6 +93,50 @@ public class MapManager {
             template.placeInWorld(level, anchor, anchor, new StructurePlaceSettings(), level.getRandom(), 2);
         } catch (IOException e) {
             throw new IllegalStateException("地图模板读取失败：" + map.template(), e);
+        }
+    }
+
+    // ---- 建图辅助 ----
+
+    // 预览标记位置记录（内存）：服务器重启后丢失，残留标记只能手动拆除
+    private static final Set<BlockPos> PREVIEW_MARKERS = new HashSet<>();
+
+    // 放置保存范围预览标记：X/Z 平面 4 个角在 ±(radius+1)（模板范围外一圈，不会混进保存内容），中心 1 块荧石。
+    // 高度方向不标记：保存范围为 ±radius 的立方，高度边界见命令反馈说明
+    public static void placePreviewMarkers(ServerLevel level, BlockPos center, int radius) {
+        clearPreviewMarkers(level);
+        int r = radius + 1;
+        for (int dx = -1; dx <= 1; dx += 2) {
+            for (int dz = -1; dz <= 1; dz += 2) {
+                BlockPos corner = new BlockPos(center.getX() + dx * r, center.getY(), center.getZ() + dz * r);
+                level.setBlockAndUpdate(corner, Blocks.GLASS.defaultBlockState());
+                PREVIEW_MARKERS.add(corner);
+            }
+        }
+        level.setBlockAndUpdate(center, Blocks.GLOWSTONE.defaultBlockState());
+        PREVIEW_MARKERS.add(center);
+    }
+
+    // 清除预览标记：仅当该位置当前仍是标记方块时才删除，不误删玩家后来放置的方块
+    public static void clearPreviewMarkers(ServerLevel level) {
+        for (BlockPos p : PREVIEW_MARKERS) {
+            BlockState state = level.getBlockState(p);
+            if (state.is(Blocks.GLASS) || state.is(Blocks.GLOWSTONE)) {
+                level.setBlockAndUpdate(p, Blocks.AIR.defaultBlockState());
+            }
+        }
+        PREVIEW_MARKERS.clear();
+    }
+
+    // 建图辅助：清空区域与掉落物，在脚下 Y-1 层铺满石砖地板作为搭图基座
+    public static void flatten(ServerLevel level, BlockPos center, int radius) {
+        clearRegion(level, center, radius);
+        clearDroppedItems(level, center, radius);
+        BlockState floor = Blocks.STONE_BRICKS.defaultBlockState();
+        for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
+            for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
+                level.setBlockAndUpdate(new BlockPos(x, center.getY() - 1, z), floor);
+            }
         }
     }
 
