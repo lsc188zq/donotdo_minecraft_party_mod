@@ -4,11 +4,15 @@ import com.partygame.game.GameManager;
 import com.partygame.game.GamePhase;
 import com.partygame.game.PlayerState;
 import com.partygame.task.TriggerType;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.level.block.BasePressurePlateBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -74,12 +78,26 @@ public class GameEventListeners {
         }
     }
 
-    // 破坏方块 → BREAK_BLOCK
+    // 破坏方块 → BREAK_BLOCK；游戏期间受保护方块（配置名单 + 按钮/压力板）不可破坏
     @SubscribeEvent
     public static void onBreak(BlockEvent.BreakEvent event) {
         if (event.getPlayer() instanceof ServerPlayer p && inPlay(p)) {
             gm().onTrigger(p, TriggerType.BREAK_BLOCK);
         }
+        // 取消保护方块的实际破坏；触发判定在上方照常执行（no_break_place 任务仍有效）。
+        // 保护时机：对局期间全场生效；已设置竞技场时场内区域在开局前（IDLE）也保护
+        if (isProtected(event.getState())
+                && (gm().phase() != GamePhase.IDLE || gm().isInsideArena(event.getPos()))) {
+            event.setCanceled(true);
+        }
+    }
+
+    // 受保护方块：按钮/压力板（任意材质，任务机制）+ 配置名单（地板/围墙/羊毛/箱子等）
+    private static boolean isProtected(BlockState state) {
+        Block block = state.getBlock();
+        return block instanceof ButtonBlock
+                || block instanceof BasePressurePlateBlock
+                || gm().config().protectedBlocks().contains(block);
     }
 
     // 放置方块 → PLACE_BLOCK
@@ -126,10 +144,13 @@ public class GameEventListeners {
         if (p.isShiftKeyDown()) {
             gm().onTrigger(p, TriggerType.SNEAK);
         }
-        // 站在竞技场压力板上累计 60 tick（3 秒）触发 STAND_PLATE_3S
+        // 站在竞技场压力板上累计 60 tick（3 秒）触发 STAND_PLATE_3S。
+        // 压力板只有 1/16 格厚，站在上面时脚部所在方块就是板子那一格，
+        // 用 below() 会拿到地板永远不匹配；同时兼容脚在板子上方一格的情形
         PlayerState s = gm().stateOf(p);
+        BlockPos feet = p.blockPosition();
         if (gm().platePos() != null
-                && p.blockPosition().below().equals(gm().platePos())) {
+                && (feet.equals(gm().platePos()) || feet.below().equals(gm().platePos()))) {
             s.addPlateStandTick();
             if (s.plateStandTicks() >= 60) {
                 s.resetPlateStandTicks();

@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock;
+import net.minecraft.world.level.block.WallTorchBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
@@ -58,6 +59,21 @@ public class ArenaGenerator {
             int sx = center.getX() + (int) Math.round((half - 3) * Math.cos(angle));
             int sz = center.getZ() + (int) Math.round((half - 3) * Math.sin(angle));
             level.setBlockAndUpdate(new BlockPos(sx, floorY + 1, sz), Blocks.RED_WOOL.defaultBlockState());
+        }
+
+        // 内墙火把照明：四面墙每隔 4 格挂一支（朝场内），避免夜晚场地全黑
+        BlockState torch = Blocks.WALL_TORCH.defaultBlockState();
+        for (int i = minX; i <= maxX; i += 4) {
+            level.setBlockAndUpdate(new BlockPos(i, floorY + 2, minZ),
+                    torch.setValue(WallTorchBlock.FACING, Direction.SOUTH));
+            level.setBlockAndUpdate(new BlockPos(i, floorY + 2, maxZ),
+                    torch.setValue(WallTorchBlock.FACING, Direction.NORTH));
+        }
+        for (int i = minZ + 1; i < maxZ; i += 4) {
+            level.setBlockAndUpdate(new BlockPos(minX, floorY + 2, i),
+                    torch.setValue(WallTorchBlock.FACING, Direction.EAST));
+            level.setBlockAndUpdate(new BlockPos(maxX, floorY + 2, i),
+                    torch.setValue(WallTorchBlock.FACING, Direction.WEST));
         }
 
         // 东南角地面压力板

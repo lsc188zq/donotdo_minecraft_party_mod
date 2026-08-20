@@ -11,6 +11,7 @@ import java.util.List;
 // 倒计时在客户端本地递减：服务端仅在状态变化时发包，避免每秒刷新
 // 21.11.45 的 @EventBusSubscriber 没有 bus 属性，改由 PartyGame 构造器
 // 在客户端侧执行 NeoForge.EVENT_BUS.register(PartyHud.class) 注册。
+// 颜色必须带 alpha 前 8 位（0xFF 开头），否则文字全透明不可见
 public class PartyHud {
     private static int round;
     private static String phase = "";
@@ -36,19 +37,19 @@ public class PartyHud {
         int x = event.getGuiGraphics().guiWidth() - 180;
         int y = 10;
         if (round > 0) {
-            event.getGuiGraphics().drawString(mc.font, "§6第 " + round + " 轮", x, y, 0xFFFFFF, true);
+            event.getGuiGraphics().drawString(mc.font, "§6第 " + round + " 轮", x, y, 0xFFFFFFFF, true);
             y += 12;
         }
         if (!phase.isEmpty()) {
             // 本地递减的剩余秒数；等待开局时无倒计时
             int remaining = Math.max(0, (int) ((countdownEndsAtMillis - System.currentTimeMillis() + 999) / 1000));
             String line = "等待开局".equals(phase) ? "§7" + phase : phase + " " + remaining + "s";
-            event.getGuiGraphics().drawString(mc.font, line, x, y, 0xFFFFFF, true);
+            event.getGuiGraphics().drawString(mc.font, line, x, y, 0xFFFFFFFF, true);
             y += 12;
         }
         if (!myMustDo.isEmpty()) {
             String done = myMustDoDone ? " §a✓" : "";
-            event.getGuiGraphics().drawString(mc.font, "你的必做：§a" + myMustDo + done, x, y, 0xFFFFFF, true);
+            event.getGuiGraphics().drawString(mc.font, "你的必做：§a" + myMustDo + done, x, y, 0xFFFFFFFF, true);
             y += 12;
         }
         for (SyncStatesPayload.Row row : rows) {
@@ -63,9 +64,9 @@ public class PartyHud {
 
     // 颜色按分数：0-1 白 / 2-3 黄 / 4 紫 / 5+ 金
     private static int colorOf(int score) {
-        if (score >= 5) return 0xFFD700;
-        if (score >= 4) return 0xAA00AA;
-        if (score >= 2) return 0xFFFF00;
-        return 0xFFFFFF;
+        if (score >= 5) return 0xFFFFD700;
+        if (score >= 4) return 0xFFAA00AA;
+        if (score >= 2) return 0xFFFFFF00;
+        return 0xFFFFFFFF;
     }
 }

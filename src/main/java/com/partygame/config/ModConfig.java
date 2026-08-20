@@ -8,6 +8,9 @@ import com.partygame.map.MapData;
 import com.partygame.task.TaskDefinition;
 import com.partygame.task.TaskType;
 import com.partygame.task.TriggerType;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Block;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,9 +38,16 @@ public class ModConfig {
             }
             ModConfig config = new ModConfig(GSON.fromJson(Files.readString(configFile), JsonObject.class));
             config.file = configFile;
-            // 旧配置缺少 maps 字段时补上空数组，避免后续访问 NPE
+            // 旧配置缺少 maps/protectedBlocks 字段时补默认值，避免后续访问 NPE
             if (!config.root.has("maps")) {
                 config.root.add("maps", new JsonArray());
+            }
+            if (!config.root.has("protectedBlocks")) {
+                JsonArray blocks = new JsonArray();
+                for (String id : List.of("minecraft:stone_bricks", "minecraft:red_wool", "minecraft:chest")) {
+                    blocks.add(id);
+                }
+                config.root.add("protectedBlocks", blocks);
             }
             return config;
         } catch (Exception e) {
@@ -97,6 +107,15 @@ public class ModConfig {
     public void removeMap(String name) {
         root.getAsJsonArray("maps").asList()
                 .removeIf(e -> e.getAsJsonObject().get("name").getAsString().equals(name));
+    }
+
+    // 游戏期间不可破坏的方块 id 名单；id 写错启动即抛异常，尽早暴露配置错误
+    public Set<Block> protectedBlocks() {
+        return root.getAsJsonArray("protectedBlocks").asList().stream()
+                .map(e -> BuiltInRegistries.BLOCK
+                        .getOptional(Identifier.parse(e.getAsString()))
+                        .orElseThrow(() -> new IllegalArgumentException("配置中的受保护方块不存在：" + e.getAsString())))
+                .collect(Collectors.toSet());
     }
 
     // ---- 可调的整型配置（/party config set）----

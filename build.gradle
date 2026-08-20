@@ -73,9 +73,10 @@ neoForge {
             programArgument 'Dev2'
         }
 
+        // 不传 --nogui：dev 环境 gradle 终端不转发键盘输入，
+        // 带 GUI 的服务器窗口才有命令输入框（op Dev 等在 GUI 里输入）
         server {
             server()
-            programArgument '--nogui'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
         // This run config launches GameTestServer and runs all registered gametests, then exits.

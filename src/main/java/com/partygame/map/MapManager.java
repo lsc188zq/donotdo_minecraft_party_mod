@@ -9,9 +9,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.phys.AABB;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,10 +28,39 @@ public class MapManager {
 
     // 把当前地图落地到以 center 为中心的位置（每回合调用，覆盖区域不恢复）
     public static void land(ServerLevel level, BlockPos center, ModConfig config, MapData map) {
+        // 先清空区域内所有旧方块与掉落物，避免上一张地图/地形的残留与新地图混杂；
+        // 新地图内容由随后的生成/粘贴重建（模板粘贴会连同空气一起覆盖）
+        int scanRadius = map.type() == MapData.MapType.PROCEDURAL ? config.arenaHalfSize() : map.radius();
+        clearRegion(level, center, scanRadius);
+        clearDroppedItems(level, center, scanRadius);
         if (map.type() == MapData.MapType.PROCEDURAL) {
             ArenaGenerator.generate(level, center, config, level.getRandom());
         } else {
             pasteTemplate(level, center, map);
+        }
+    }
+
+    // 把以 center 为中心 ±radius 立方范围内所有非空气方块替换为空气
+    private static void clearRegion(ServerLevel level, BlockPos center, int radius) {
+        for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
+            for (int y = center.getY() - radius; y <= center.getY() + radius; y++) {
+                for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
+                    BlockPos p = new BlockPos(x, y, z);
+                    if (!level.getBlockState(p).isAir()) {
+                        level.setBlockAndUpdate(p, Blocks.AIR.defaultBlockState());
+                    }
+                }
+            }
+        }
+    }
+
+    // 清除区域内的掉落物（上局死亡/丢弃的物品不残留到新地图）
+    private static void clearDroppedItems(ServerLevel level, BlockPos center, int radius) {
+        AABB area = new AABB(
+                center.getX() - radius, center.getY() - radius, center.getZ() - radius,
+                center.getX() + radius + 1, center.getY() + radius + 1, center.getZ() + radius + 1);
+        for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, area)) {
+            item.discard();
         }
     }
 

@@ -71,6 +71,16 @@ public class GameManager {
     public boolean isArenaSet() { return arenaCenter != null; }
     public void setArenaCenter(BlockPos center) { this.arenaCenter = center; }
     public BlockPos arenaCenter() { return arenaCenter; }
+
+    // 坐标是否落在已设置的竞技场区域内（供开局前 IDLE 期间的场地保护判断）
+    public boolean isInsideArena(BlockPos pos) {
+        if (arenaCenter == null) return false;
+        MapData map = selectedMapData();
+        int radius = map.type() == MapData.MapType.PROCEDURAL ? config.arenaHalfSize() : map.radius();
+        return Math.abs(pos.getX() - arenaCenter.getX()) <= radius
+                && Math.abs(pos.getY() - arenaCenter.getY()) <= radius
+                && Math.abs(pos.getZ() - arenaCenter.getZ()) <= radius;
+    }
     public void setPlatePos(BlockPos pos) { this.platePos = pos; }
     public BlockPos platePos() { return platePos; }
     public GamePhase phase() { return phase; }
@@ -101,6 +111,8 @@ public class GameManager {
 
     private void beginRound() {
         round++;
+        // 游戏时间设为正午（6000），避免对局入夜；每回合刷新一次
+        currentLevel.setDayTime(6000);
         // 落地当前地图（程序生成房重建 / 自建地图重新粘贴，恢复被破坏的方块）
         MapData map = selectedMapData();
         MapManager.land(currentLevel, arenaCenter, config, map);
@@ -197,6 +209,8 @@ public class GameManager {
                 if (p != null) broadcast("§a" + p.getScoreboardName() + " 存活 +1 分（当前 " + s.score() + " 分）");
             }
         }
+        // 结算期开始前重置地图：修复对局中被破坏的方块
+        MapManager.land(currentLevel, arenaCenter, config, selectedMapData());
         enterPhase(GamePhase.SCORING);
         // 分数变化后刷新计分板
         if (currentLevel != null) {
