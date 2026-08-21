@@ -24,6 +24,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 // 把 MC 事件翻译成任务触发信号，所有判定交给 GameManager。
@@ -176,5 +177,11 @@ public class GameEventListeners {
         if (event.getEntity() instanceof ServerPlayer p) {
             gm().onPlayerLeave(p);
         }
+    }
+
+    // 服务器停止（退出世界/关服）：重置游戏状态，避免旧对局残留到新世界
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        gm().resetForWorldExit();
     }
 }

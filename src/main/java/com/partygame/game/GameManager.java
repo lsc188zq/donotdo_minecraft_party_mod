@@ -121,6 +121,16 @@ public class GameManager {
         }
     }
 
+    // 服务器停止（退出世界/关服）时重置：单例状态不随世界卸载而清空，
+    // 不重置会让重进世界后旧对局继续跑、旧世界引用残留
+    public void resetForWorldExit() {
+        phase = GamePhase.IDLE;
+        states.clear();
+        round = 0;
+        countdownTicks = 0;
+        currentLevel = null;
+    }
+
     // ---------- 回合流程 ----------
 
     private void beginRound() {

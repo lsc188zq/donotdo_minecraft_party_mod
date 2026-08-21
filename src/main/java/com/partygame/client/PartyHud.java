@@ -3,6 +3,7 @@ package com.partygame.client;
 import com.partygame.network.SyncStatesPayload;
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 
 import java.util.List;
@@ -27,6 +28,17 @@ public class PartyHud {
         myMustDo = payload.myMustDo();
         myMustDoDone = payload.myMustDoDone();
         rows = payload.rows();
+    }
+
+    // 退出世界时清空显示状态：静态字段不随世界卸载重置，不清会残留旧对局界面
+    @SubscribeEvent
+    public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        round = 0;
+        phase = "";
+        countdownEndsAtMillis = 0;
+        myMustDo = "";
+        myMustDoDone = false;
+        rows = List.of();
     }
 
     @SubscribeEvent
