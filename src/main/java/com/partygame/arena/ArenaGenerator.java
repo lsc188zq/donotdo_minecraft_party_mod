@@ -5,7 +5,7 @@ import com.partygame.game.GameManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.Item;
@@ -112,7 +112,7 @@ public class ArenaGenerator {
     private static Item randomItem(ServerLevel level, List<String> ids, RandomSource random) {
         String id = ids.get(random.nextInt(ids.size()));
         return BuiltInRegistries.ITEM
-                .getOptional(Identifier.parse(id))
+                .getOptional(ResourceLocation.parse(id))
                 .orElse(Items.STONE);
     }
 }

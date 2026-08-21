@@ -73,8 +73,8 @@ public class MapManager {
         StructureTemplate template = new StructureTemplate();
         BlockPos from = center.offset(-radius, -radius, -radius);
         Vec3i size = new Vec3i(radius * 2 + 1, radius * 2 + 1, radius * 2 + 1);
-        // 忽略方块传结构空位：地图里即使有也原样保存
-        template.fillFromWorld(level, from, size, false, List.of(Blocks.STRUCTURE_VOID));
+        // 忽略方块传结构空位：地图里即使有也原样保存（1.21.1 为单方块参数）
+        template.fillFromWorld(level, from, size, false, Blocks.STRUCTURE_VOID);
         Path dir = Paths.get(TEMPLATE_DIR);
         Files.createDirectories(dir);
         NbtIo.writeCompressed(template.save(new CompoundTag()), dir.resolve(name + ".nbt"));

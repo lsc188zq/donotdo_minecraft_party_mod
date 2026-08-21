@@ -18,7 +18,6 @@ import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.GameType;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -165,11 +164,10 @@ public class GameManager {
             p.setGameMode(GameType.SURVIVAL);
             p.getInventory().clearContent();
             BlockPos spawn = spawnPoints.get(i);
-            // 出生在随机分配的羊毛出生点上方 1 格
-            // 21.11.45 的签名带 setCamera 参数；空相对集 = 按绝对坐标传送
+            // 出生在随机分配的羊毛出生点上方 1 格（1.21.1 旧 6 参数签名，按绝对坐标传送）
             p.teleportTo(currentLevel,
                     spawn.getX() + 0.5, spawn.getY() + 1.0, spawn.getZ() + 0.5,
-                    java.util.Set.<Relative>of(), p.getYRot(), p.getXRot(), true);
+                    p.getYRot(), p.getXRot());
             p.sendSystemMessage(Component.literal("你的必做任务：§a" + s.mustDo().displayName()));
             // 屏幕大字提示（21.11.45 无 displayTitle 方法，用发包方式）
             p.connection.send(new ClientboundSetTitleTextPacket(Component.literal("你的必做任务")));

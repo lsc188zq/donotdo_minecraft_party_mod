@@ -34,7 +34,7 @@ public class PartyGame {
         // 注册事件监听器类（静态 @SubscribeEvent 方法，注册 Class 即可）
         NeoForge.EVENT_BUS.register(GameEventListeners.class);
         // 客户端专用：注册 HUD 渲染监听器（专用服务器上此分支不执行，不加载 PartyHud）
-        if (FMLEnvironment.getDist().isClient()) {
+        if (FMLEnvironment.dist.isClient()) {
             NeoForge.EVENT_BUS.register(PartyHud.class);
         }
         // 注册计分板同步包（服务端 → 客户端；处理器只在客户端执行）

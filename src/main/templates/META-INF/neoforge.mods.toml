@@ -8,6 +8,12 @@
 # Review your options at https://choosealicense.com/. All rights reserved is the default copyright stance, and is thus the default here.
 license="${mod_license}"
 
+# The FML language loader used by this mod（1.21.1 的 FML 4.0.43 要求顶层声明此字段）
+modLoader="javafml" #mandatory
+
+# The FML loader version range（与 modLoader 配套的必填字段）
+loaderVersion="[4,)" #mandatory
+
 # A URL to refer people to when problems occur with this mod
 #issueTrackerURL="https://change.me.to.your.issue.tracker.example.invalid/" #optional
 

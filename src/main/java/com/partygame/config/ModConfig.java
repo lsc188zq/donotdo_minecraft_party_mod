@@ -9,7 +9,7 @@ import com.partygame.task.TaskDefinition;
 import com.partygame.task.TaskType;
 import com.partygame.task.TriggerType;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 
 import java.nio.file.Files;
@@ -118,7 +118,7 @@ public class ModConfig {
     public Set<Block> protectedBlocks() {
         return root.getAsJsonArray("protectedBlocks").asList().stream()
                 .map(e -> BuiltInRegistries.BLOCK
-                        .getOptional(Identifier.parse(e.getAsString()))
+                        .getOptional(ResourceLocation.parse(e.getAsString()))
                         .orElseThrow(() -> new IllegalArgumentException("配置中的受保护方块不存在：" + e.getAsString())))
                 .collect(Collectors.toSet());
     }

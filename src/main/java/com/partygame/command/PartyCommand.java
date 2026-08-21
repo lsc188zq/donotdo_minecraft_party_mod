@@ -30,13 +30,13 @@ public class PartyCommand {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("party")
                 .then(Commands.literal("setarena")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .executes(ctx -> setArena(ctx.getSource())))
                 .then(Commands.literal("start")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .executes(ctx -> start(ctx.getSource())))
                 .then(Commands.literal("stop")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .executes(ctx -> stop(ctx.getSource())))
                 .then(Commands.literal("score")
                         .executes(ctx -> score(ctx.getSource())))
@@ -49,7 +49,7 @@ public class PartyCommand {
     private static LiteralArgumentBuilder<CommandSourceStack> mapCommand() {
         return Commands.literal("map")
                 .then(Commands.literal("save")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .then(Commands.argument("radius", IntegerArgumentType.integer(5, 100))
                                         .executes(ctx -> mapSave(ctx.getSource(),
@@ -58,18 +58,18 @@ public class PartyCommand {
                 .then(Commands.literal("list")
                         .executes(ctx -> mapList(ctx.getSource())))
                 .then(Commands.literal("remove")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(ctx -> mapRemove(ctx.getSource(),
                                         StringArgumentType.getString(ctx, "name")))))
                 .then(Commands.literal("choose")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(ctx -> mapChoose(ctx.getSource(),
                                         StringArgumentType.getString(ctx, "name")))))
                 .then(previewCommand())
                 .then(Commands.literal("platform")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .then(Commands.argument("radius", IntegerArgumentType.integer(5, 100))
                                 .executes(ctx -> mapPlatform(ctx.getSource(),
                                         IntegerArgumentType.getInteger(ctx, "radius")))));
@@ -78,7 +78,7 @@ public class PartyCommand {
     // /party map preview 子命令：radius 放置范围标记 / clear 清除标记（建图辅助）
     private static LiteralArgumentBuilder<CommandSourceStack> previewCommand() {
         return Commands.literal("preview")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                 .then(Commands.argument("radius", IntegerArgumentType.integer(5, 100))
                         .executes(ctx -> mapPreview(ctx.getSource(),
                                 IntegerArgumentType.getInteger(ctx, "radius"))))
@@ -92,7 +92,7 @@ public class PartyCommand {
                 .then(Commands.literal("show")
                         .executes(ctx -> configShow(ctx.getSource())))
                 .then(Commands.literal("set")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .then(Commands.argument("key", StringArgumentType.word())
                                 .then(Commands.argument("value", IntegerArgumentType.integer(1))
                                         .executes(ctx -> configSet(ctx.getSource(),
@@ -106,12 +106,12 @@ public class PartyCommand {
                 .then(Commands.literal("list")
                         .executes(ctx -> tasksList(ctx.getSource())))
                 .then(Commands.literal("enable")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .executes(ctx -> tasksSet(ctx.getSource(),
                                         StringArgumentType.getString(ctx, "id"), true))))
                 .then(Commands.literal("disable")
-                        .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                        .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .executes(ctx -> tasksSet(ctx.getSource(),
                                         StringArgumentType.getString(ctx, "id"), false))));

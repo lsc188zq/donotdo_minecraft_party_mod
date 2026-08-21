@@ -5,7 +5,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
 
@@ -15,7 +15,7 @@ public record SyncStatesPayload(
         String myMustDo, boolean myMustDoDone,
         List<Row> rows) implements CustomPacketPayload {
     public static final Type<SyncStatesPayload> TYPE =
-            new Type<>(Identifier.fromNamespaceAndPath(PartyGame.MODID, "sync_states"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(PartyGame.MODID, "sync_states"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SyncStatesPayload> STREAM_CODEC =
             StreamCodec.composite(
