@@ -34,13 +34,15 @@ import java.util.UUID;
 public class GameManager {
     private static final GameManager INSTANCE = new GameManager();
     public static GameManager get() { return INSTANCE; }
-    private static final Logger LOGGER = LogUtils.getLogger();
+    public static final Logger LOGGER = LogUtils.getLogger();
 
     private ModConfig config;
     private GamePhase phase = GamePhase.IDLE;
     private int countdownTicks;               // 当前阶段剩余 tick（每秒 20 tick）
     private int round;                        // 当前第几轮（beginRound 自增）
     private final Map<UUID, PlayerState> states = new HashMap<>();
+    private final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>(); // 开局前玩家状态快照
+    private final Map<UUID, PlayerSnapshot> arenaSnapshots = new HashMap<>(); // setarena 前玩家状态快照（"家"的位置）
     private BlockPos arenaCenter;
     private BlockPos platePos;
     private final Random random = new Random();
@@ -85,11 +87,16 @@ public class GameManager {
     public void setArenaCenter(BlockPos center) { this.arenaCenter = center; }
     public BlockPos arenaCenter() { return arenaCenter; }
 
+    // 竞技场区域半径（当前选中地图的扫描半径）
+    private int arenaRadius() {
+        MapData map = selectedMapData();
+        return map.type() == MapData.MapType.PROCEDURAL ? config.arenaHalfSize() : map.radius();
+    }
+
     // 坐标是否落在已设置的竞技场区域内（供开局前 IDLE 期间的场地保护判断）
     public boolean isInsideArena(BlockPos pos) {
         if (arenaCenter == null) return false;
-        MapData map = selectedMapData();
-        int radius = map.type() == MapData.MapType.PROCEDURAL ? config.arenaHalfSize() : map.radius();
+        int radius = arenaRadius();
         return Math.abs(pos.getX() - arenaCenter.getX()) <= radius
                 && Math.abs(pos.getY() - arenaCenter.getY()) <= radius
                 && Math.abs(pos.getZ() - arenaCenter.getZ()) <= radius;
@@ -106,7 +113,17 @@ public class GameManager {
             throw new IllegalStateException("至少需要 " + config.minPlayers() + " 名玩家");
         }
         currentLevel = level;
+        // 开局前为每位在线玩家保存状态快照，游戏结束后恢复；
+        // 已有 setarena 快照（玩家被传送过）则保留，恢复时优先回"家"
+        for (ServerPlayer p : level.getServer().getPlayerList().getPlayers()) {
+            snapshots.putIfAbsent(p.getUUID(), PlayerSnapshot.capture(p));
+        }
         beginRound();
+    }
+
+    // setarena 建场前保存玩家状态快照（玩家被传送前的位置 = 其"家"）
+    public void captureArenaSnapshot(ServerPlayer p) {
+        arenaSnapshots.put(p.getUUID(), PlayerSnapshot.capture(p));
     }
 
     public void stopGame() {
@@ -114,10 +131,45 @@ public class GameManager {
         states.clear();
         round = 0;
         broadcast("游戏已终止");
+        // 恢复玩家开局前状态（位置/背包/模式/血量）
+        restoreAllPlayers();
         // 手动终止后清掉各客户端残留的计分板内容
         if (currentLevel != null) {
             ScoreboardManager.refresh(currentLevel.getServer());
         }
+    }
+
+    // 快照位置若在竞技场内（开局时玩家就站在场内），改到竞技场外缘，
+    // 避免游戏结束后"传回去"仍落在场地里
+    private BlockPos adjustedRestorePos(BlockPos pos) {
+        if (arenaCenter == null || !isInsideArena(pos)) return pos;
+        return new BlockPos(arenaCenter.getX() + arenaRadius() + 2, pos.getY(), pos.getZ());
+    }
+
+    // 玩家要恢复的快照：优先 setarena 前（"家"），其次开局前
+    private PlayerSnapshot snapshotFor(ServerPlayer p) {
+        PlayerSnapshot arena = arenaSnapshots.remove(p.getUUID());
+        return arena != null ? arena : snapshots.remove(p.getUUID());
+    }
+
+    // 恢复所有在线玩家的快照（游戏结束/终止时调用）
+    private void restoreAllPlayers() {
+        if (currentLevel == null) return;
+        for (ServerPlayer p : currentLevel.getServer().getPlayerList().getPlayers()) {
+            PlayerSnapshot snap = snapshotFor(p);
+            if (snap != null) {
+                ServerLevel dim = p.getServer().getLevel(snap.dimension());
+                snap.restore(p, dim != null ? dim : currentLevel, adjustedRestorePos(snap.pos()));
+            }
+        }
+    }
+
+    // 掉线玩家重连时恢复其快照（开局期间掉线物品不丢）
+    public void restoreOnLogin(ServerPlayer player) {
+        PlayerSnapshot snap = snapshotFor(player);
+        if (snap == null || currentLevel == null) return;
+        ServerLevel dim = player.getServer().getLevel(snap.dimension());
+        snap.restore(player, dim != null ? dim : currentLevel, adjustedRestorePos(snap.pos()));
     }
 
     // 服务器停止（退出世界/关服）时重置：单例状态不随世界卸载而清空，
@@ -128,6 +180,8 @@ public class GameManager {
         round = 0;
         countdownTicks = 0;
         currentLevel = null;
+        snapshots.clear();
+        arenaSnapshots.clear();
     }
 
     // ---------- 回合流程 ----------
@@ -163,6 +217,10 @@ public class GameManager {
             // 传送进场、清背包、回生存模式
             p.setGameMode(GameType.SURVIVAL);
             p.getInventory().clearContent();
+            // 每轮进场重置：回满血量与饥饿、清除所有药水效果，避免上一轮残留的 buff/debuff 带入本轮
+            p.setHealth(p.getMaxHealth());
+            p.getFoodData().setFoodLevel(20);
+            p.removeAllEffects();
             BlockPos spawn = spawnPoints.get(i);
             // 出生在随机分配的羊毛出生点上方 1 格（1.21.1 旧 6 参数签名，按绝对坐标传送）
             p.teleportTo(currentLevel,
@@ -195,7 +253,13 @@ public class GameManager {
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         if (phase == GamePhase.IDLE || phase == GamePhase.FINISHED) return;
+        // 每秒向客户端同步一次倒计时：服务器卡顿（低 TPS）时 HUD 显示真实剩余，
+        // 避免客户端按真实时间走的倒计时与服务端 tick 错位（观感"卡住"）
+        if (countdownTicks % 20 == 0 && currentLevel != null) {
+            ScoreboardManager.refresh(currentLevel.getServer());
+        }
         if (--countdownTicks > 0) return;
+        LOGGER.info("[诊断] 倒计时归零，当前阶段 {}", phase);
 
         switch (phase) {
             case PREPARING -> {
@@ -256,6 +320,8 @@ public class GameManager {
         phase = GamePhase.IDLE;
         states.clear();
         round = 0;
+        // 恢复玩家开局前状态（位置/背包/模式/血量）
+        restoreAllPlayers();
         if (currentLevel != null) {
             ScoreboardManager.refresh(currentLevel.getServer());
         }
@@ -323,9 +389,10 @@ public class GameManager {
         if (currentLevel != null) {
             ScoreboardManager.refresh(currentLevel.getServer());
         }
-        // 对局中全员出局 → 立即结束本回合（无人得分），结算后自动进入下一回合；
+        // 对局或准备期中全员出局 → 立即结束本回合（无人得分），结算后自动进入下一回合；
+        // 准备期也可能死亡（刷怪/坠落），不处理会导致"已淘汰却进入对局"；
         // "服务器仍有玩家在线"区分全员掉线：掉线走 onPlayerLeave 的 stopGame 回 IDLE
-        if (phase == GamePhase.PLAYING
+        if ((phase == GamePhase.PLAYING || phase == GamePhase.PREPARING)
                 && !currentLevel.getServer().getPlayerList().getPlayers().isEmpty()
                 && states.values().stream().noneMatch(PlayerState::isAlive)) {
             broadcast("§c全军覆没！本回合无人得分");

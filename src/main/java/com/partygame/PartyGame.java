@@ -10,8 +10,11 @@ import com.partygame.event.GameEventListeners;
 import com.partygame.game.GameManager;
 import com.partygame.network.SyncStatesPayload;
 
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.FireBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -39,6 +42,9 @@ public class PartyGame {
         }
         // 注册计分板同步包（服务端 → 客户端；处理器只在客户端执行）
         modEventBus.addListener(this::registerPayloads);
+        // 红色羊毛设为不可燃：出生点标记方块不能被火焰烧毁（打火石/蔓延）
+        modEventBus.addListener((FMLCommonSetupEvent e) ->
+                ((FireBlock) Blocks.FIRE).setFlammable(Blocks.RED_WOOL, 0, 0));
         // 注册 /party 命令（RegisterCommandsEvent 在游戏总线上触发）
         NeoForge.EVENT_BUS.addListener(
                 (RegisterCommandsEvent event) -> PartyCommand.register(event.getDispatcher()));

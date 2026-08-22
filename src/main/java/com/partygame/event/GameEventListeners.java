@@ -20,10 +20,12 @@ import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEntityUseItemEvent;
 import net.neoforged.neoforge.event.entity.living.LivingEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.MobSpawnEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
@@ -85,12 +87,30 @@ public class GameEventListeners {
         if (event.getPlayer() instanceof ServerPlayer p && inPlay(p)) {
             gm().onTrigger(p, TriggerType.BREAK_BLOCK);
         }
-        // 取消保护方块的实际破坏；触发判定在上方照常执行（no_break_place 任务仍有效）。
-        // 保护时机：对局期间全场生效；已设置竞技场时场内区域在开局前（IDLE）也保护
-        if (isProtected(event.getState())
-                && (gm().phase() != GamePhase.IDLE || gm().isInsideArena(event.getPos()))) {
+        // 取消保护方块的实际破坏；触发判定在上方照常执行（no_break_place 任务仍有效）
+        if (isBreakProtected(event.getPos(), event.getState())) {
             event.setCanceled(true);
         }
+    }
+
+    // 爆炸不得破坏受保护方块（TNT 等走 ExplosionEvent，绕过 BreakEvent，需单独拦截）
+    @SubscribeEvent
+    public static void onExplosion(ExplosionEvent.Detonate event) {
+        event.getAffectedBlocks().removeIf(pos -> isBreakProtected(pos, event.getLevel().getBlockState(pos)));
+    }
+
+    // 竞技场区域内禁止自然刷怪（已设竞技场时生效，防止对局期间场内出现怪物）
+    @SubscribeEvent
+    public static void onMobSpawn(MobSpawnEvent.PositionCheck event) {
+        if (gm().isArenaSet() && gm().isInsideArena(event.getEntity().blockPosition())) {
+            event.setResult(MobSpawnEvent.PositionCheck.Result.FAIL);
+        }
+    }
+
+    // 保护时机：对局期间全场生效；已设置竞技场时场内区域在开局前（IDLE）也保护
+    private static boolean isBreakProtected(BlockPos pos, BlockState state) {
+        return isProtected(state)
+                && (gm().phase() != GamePhase.IDLE || gm().isInsideArena(pos));
     }
 
     // 受保护方块：按钮/压力板（任意材质，任务机制）+ 配置名单（地板/围墙/羊毛/箱子等）
@@ -145,13 +165,16 @@ public class GameEventListeners {
         if (p.isShiftKeyDown()) {
             gm().onTrigger(p, TriggerType.SNEAK);
         }
-        // 站在竞技场压力板上累计 60 tick（3 秒）触发 STAND_PLATE_3S。
+        // 站在竞技场内任意压力板上累计 60 tick（3 秒）触发 STAND_PLATE_3S。
         // 压力板只有 1/16 格厚，站在上面时脚部所在方块就是板子那一格，
         // 用 below() 会拿到地板永远不匹配；同时兼容脚在板子上方一格的情形
         PlayerState s = gm().stateOf(p);
         BlockPos feet = p.blockPosition();
-        if (gm().platePos() != null
-                && (feet.equals(gm().platePos()) || feet.below().equals(gm().platePos()))) {
+        BlockState feetState = p.level().getBlockState(feet);
+        BlockState belowState = p.level().getBlockState(feet.below());
+        boolean onPlate = feetState.getBlock() instanceof BasePressurePlateBlock
+                || belowState.getBlock() instanceof BasePressurePlateBlock;
+        if (gm().isInsideArena(feet) && onPlate) {
             s.addPlateStandTick();
             if (s.plateStandTicks() >= 60) {
                 s.resetPlateStandTicks();
@@ -176,6 +199,14 @@ public class GameEventListeners {
     public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity() instanceof ServerPlayer p) {
             gm().onPlayerLeave(p);
+        }
+    }
+
+    // 掉线玩家重连：恢复开局前快照（开局期间掉线的玩家物品不丢）
+    @SubscribeEvent
+    public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer p) {
+            gm().restoreOnLogin(p);
         }
     }
 

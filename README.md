@@ -11,7 +11,7 @@
 
 | 工具 | 版本/说明 |
 | --- | --- |
-| Minecraft | 1.21.11 + NeoForge 21.11.45 |
+| Minecraft | 1.21.1 + NeoForge 21.1.248 |
 | JDK | 21（ Microsoft OpenJDK 21，64 位） |
 | IDE | IntelliJ IDEA Community |
 | 构建 | Gradle |

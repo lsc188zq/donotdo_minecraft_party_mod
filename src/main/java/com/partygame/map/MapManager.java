@@ -2,6 +2,7 @@ package com.partygame.map;
 
 import com.partygame.arena.ArenaGenerator;
 import com.partygame.config.ModConfig;
+import com.partygame.game.GameManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.Registries;
@@ -10,6 +11,7 @@ import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.level.block.BasePressurePlateBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
@@ -42,6 +44,27 @@ public class MapManager {
         } else {
             pasteTemplate(level, center, map);
         }
+        // 落地后统一扫描地图内的压力板（STAND_PLATE_3S 任务用）：
+        // 程序生成房与自建/内置模板地图都适用；没有板子则置空，避免残留旧位置
+        BlockPos plate = scanPressurePlate(level, center, scanRadius);
+        GameManager.get().setPlatePos(plate);
+        // 临时诊断：确认地图内是否有压力板被识别（定位后删除）
+        GameManager.LOGGER.info("[诊断] 地图 {} 落地，压力板位置：{}", map.name(), plate);
+    }
+
+    // 扫描区域内第一块压力板；没有则返回 null
+    public static BlockPos scanPressurePlate(ServerLevel level, BlockPos center, int radius) {
+        for (int x = center.getX() - radius; x <= center.getX() + radius; x++) {
+            for (int y = center.getY() - radius; y <= center.getY() + radius; y++) {
+                for (int z = center.getZ() - radius; z <= center.getZ() + radius; z++) {
+                    BlockPos p = new BlockPos(x, y, z);
+                    if (level.getBlockState(p).getBlock() instanceof BasePressurePlateBlock) {
+                        return p;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     // 把以 center 为中心 ±radius 立方范围内所有非空气方块替换为空气

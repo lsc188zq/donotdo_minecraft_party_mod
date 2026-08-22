@@ -10,7 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import com.partygame.config.ModConfig;
 import com.partygame.game.GameManager;
@@ -20,8 +23,12 @@ import com.partygame.map.MapManager;
 import com.partygame.task.TaskDefinition;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 
 // /party 系列命令：setarena（站中心点）/ start / stop / score。
 // 21.11.11 用新权限系统：管理员级 = Commands.LEVEL_GAMEMASTERS（旧 op 等级 2）
@@ -31,7 +38,10 @@ public class PartyCommand {
         dispatcher.register(Commands.literal("party")
                 .then(Commands.literal("setarena")
                         .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
-                        .executes(ctx -> setArena(ctx.getSource())))
+                        .executes(ctx -> setArena(ctx.getSource(), null))
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                .executes(ctx -> setArena(ctx.getSource(),
+                                        BlockPosArgument.getLoadedBlockPos(ctx, "pos")))))
                 .then(Commands.literal("start")
                         .requires(src -> src.hasPermission(2)) // 1.21.1 旧权限系统：op 等级 2 = 管理员
                         .executes(ctx -> start(ctx.getSource())))
@@ -117,7 +127,7 @@ public class PartyCommand {
                                         StringArgumentType.getString(ctx, "id"), false))));
     }
 
-    private static int setArena(CommandSourceStack source) {
+    private static int setArena(CommandSourceStack source, BlockPos safePos) {
         if (!(source.getEntity() instanceof ServerPlayer p)) {
             source.sendFailure(Component.literal("该命令需由玩家站在竞技场中心点执行"));
             return 0;
@@ -125,10 +135,42 @@ public class PartyCommand {
         GameManager gm = GameManager.get();
         ModConfig config = gm.config();
         MapData map = gm.selectedMapData();
-        // 先落地并扫描出生点，数量不足直接拒绝，不记录中心
-        MapManager.land(source.getLevel(), p.blockPosition(), config, map);
         int scanRadius = map.type() == MapData.MapType.PROCEDURAL ? config.arenaHalfSize() : map.radius();
-        int spawnCount = MapManager.scanSpawns(source.getLevel(), p.blockPosition(), scanRadius).size();
+        BlockPos center = p.blockPosition();
+        // 安全点：未指定时默认竞技场中心正上方 120 格（远离场地），指定坐标则传送到该坐标
+        BlockPos safe = safePos != null ? safePos : center.above(120);
+        // 建场前把区域内玩家移到安全点：区域会被整体清空，留在原地会坠坑或被方块覆盖；
+        // 移出前保存快照（其"家"的位置），游戏结束优先恢复到此处
+        Map<UUID, BlockPos> displaced = new HashMap<>();
+        for (ServerPlayer sp : source.getServer().getPlayerList().getPlayers()) {
+            BlockPos pos = sp.blockPosition();
+            if (Math.abs(pos.getX() - center.getX()) <= scanRadius
+                    && Math.abs(pos.getY() - center.getY()) <= scanRadius
+                    && Math.abs(pos.getZ() - center.getZ()) <= scanRadius) {
+                gm.captureArenaSnapshot(sp);
+                displaced.put(sp.getUUID(), pos);
+                // 传送到安全点，并附加缓降效果防止高空坠落摔伤
+                sp.teleportTo(source.getLevel(),
+                        safe.getX() + 0.5, safe.getY(), safe.getZ() + 0.5,
+                        sp.getYRot(), sp.getXRot());
+                sp.fallDistance = 0;
+                sp.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 400, 0, false, false));
+            }
+        }
+        // 先落地并扫描出生点，数量不足直接拒绝，不记录中心
+        MapManager.land(source.getLevel(), center, config, map);
+        // 原位置在新地图中仍是空地则传送回去，否则留在安全点
+        for (Map.Entry<UUID, BlockPos> e : displaced.entrySet()) {
+            ServerPlayer sp = source.getServer().getPlayerList().getPlayer(e.getKey());
+            BlockPos orig = e.getValue();
+            if (sp != null && source.getLevel().isEmptyBlock(orig)) {
+                sp.teleportTo(source.getLevel(),
+                        orig.getX() + 0.5, orig.getY(), orig.getZ() + 0.5,
+                        sp.getYRot(), sp.getXRot());
+                sp.fallDistance = 0;
+            }
+        }
+        int spawnCount = MapManager.scanSpawns(source.getLevel(), center, scanRadius).size();
         if (spawnCount < config.minPlayers()) {
             source.sendFailure(Component.literal(
                     "出生点不足：场地内只有 " + spawnCount + " 个红色羊毛，少于 minPlayers(" + config.minPlayers() + ")"));
